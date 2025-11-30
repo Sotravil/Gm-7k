@@ -1,0 +1,3068 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor Avanzado de Negocio</title>
+    <!--
+      Este documento HTML implementa un sistema integral de gestión para un
+      negocio de comida. Está diseñado como una SPA (single‑page application)
+      y se apoya únicamente en localStorage para persistir datos. El enfoque
+      principal es proporcionar un análisis financiero profundo y un registro
+      exhaustivo de todas las operaciones del negocio. Las distintas
+      secciones (Inventario, Productos, Operación, Análisis, Configuración)
+      se navegan mediante una barra inferior, y hay un menú desplegable en
+      la esquina superior derecha para opciones de usuario como historial,
+      datos, borrado, ayuda y acerca de.
+    -->
+    <style>
+        /* === Estilos Generales === */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #333;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin: 0;
+        }
+        /* Botón de menú (tres líneas) */
+        #userMenuBtn {
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        /* Menú desplegable superior */
+        #userMenu {
+            position: absolute;
+            top: 3.2rem;
+            right: 1rem;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 0.5rem;
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        #userMenu button {
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            padding: 0.5rem 1rem;
+            text-align: left;
+            cursor: pointer;
+        }
+        #userMenu button:hover {
+            background-color: #333;
+        }
+        /* Navegación inferior */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            background-color: #1e1e1e;
+            border-top: 1px solid #333;
+            padding: 0.5rem 0;
+            z-index: 900;
+        }
+        nav button {
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            text-align: center;
+            font-size: 0.8rem;
+            flex: 1;
+            cursor: pointer;
+        }
+        nav button.active {
+            color: #4caf50; /* verde para la pestaña activa */
+        }
+        /* Contenedor de secciones */
+        .section {
+            display: none;
+            padding: 1rem;
+            /* Deja suficiente espacio al final para que los botones no queden
+               ocultos detrás de la barra de navegación inferior, sobre todo en
+               dispositivos móviles. Este valor se aumentó desde 3rem a 6rem. */
+            margin-bottom: 6rem;
+        }
+        .section.active {
+            display: block;
+        }
+        /* Tarjetas genéricas */
+        .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        /* Modales */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background-color: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+        .modal h2 {
+            margin-top: 0;
+        }
+        .close-btn {
+            float: right;
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        label {
+            display: block;
+            margin-top: 0.5rem;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            margin-top: 0.25rem;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #262626;
+            color: #e0e0e0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        button.primary {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button.secondary {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #f44336;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        /* Tablas para análisis */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+        th, td {
+            border: 1px solid #333;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            background-color: #222;
+        }
+        tr:nth-child(even) {
+            background-color: #181818;
+        }
+
+        /* ----------- UI/UX Enhancements ----------- */
+        /* Toast notifications */
+        #toast {
+            position: fixed;
+            bottom: 4rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #323232;
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 2000;
+        }
+        /* Mini KPI cards for daily summary */
+        #operacionResumen {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .mini-kpi {
+            flex: 1 1 calc(50% - 0.5rem);
+            background-color: #181818;
+            border-radius: 4px;
+            padding: 0.5rem;
+        }
+        .mini-kpi-label {
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+        .mini-kpi-value {
+            font-size: 0.95rem;
+            font-weight: bold;
+        }
+        /* Empty state message */
+        .empty-state {
+            text-align: center;
+            color: #777;
+            font-style: italic;
+            padding: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1 id="businessName">Mi Negocio</h1>
+        <button id="userMenuBtn">☰</button>
+        <!-- Menú desplegable -->
+        <div id="userMenu">
+            <button id="menuHistory">Historial</button>
+            <button id="menuMyData">Mis Datos</button>
+            <button id="menuClearData">Borrar Datos</button>
+            <button id="menuHelp">Ayuda / Cómo Funciona</button>
+            <button id="menuAbout">Acerca de</button>
+        </div>
+    </header>
+
+    <!-- Secciones principales -->
+    <main>
+        <section id="operacionSection" class="section active">
+            <h2>Operación</h2>
+            <!-- Selector de fecha para navegar por días anteriores -->
+            <label for="operacionDate">Fecha:</label>
+            <input type="date" id="operacionDate" />
+            <!-- Resumen diario de ingresos, gastos, utilidad y ticket promedio -->
+            <div id="operacionResumen">
+                <div class="mini-kpi">
+                    <div class="mini-kpi-label">Ingresos hoy</div>
+                    <div class="mini-kpi-value" id="kpiIngresosHoy">0</div>
+                </div>
+                <div class="mini-kpi">
+                    <div class="mini-kpi-label">Gastos hoy</div>
+                    <div class="mini-kpi-value" id="kpiGastosHoy">0</div>
+                </div>
+                <div class="mini-kpi">
+                    <div class="mini-kpi-label">Utilidad hoy</div>
+                    <div class="mini-kpi-value" id="kpiUtilidadHoy">0</div>
+                </div>
+                <div class="mini-kpi">
+                    <div class="mini-kpi-label">Ticket prom.</div>
+                    <div class="mini-kpi-value" id="kpiTicketPromHoy">0</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Ventas</h3>
+                <button class="primary" id="addVentaBtn">Registrar Venta</button>
+                <div id="ventasList"></div>
+            </div>
+            <div class="card">
+                <h3>Gastos Variables</h3>
+                <button class="primary" id="addGastoBtn">Registrar Gasto</button>
+                <div id="gastosList"></div>
+            </div>
+            <div class="card">
+                <h3>Gastos Operativos Fijos Prorrateados</h3>
+                <p id="gastosOperativosProrrateados">Cargando...</p>
+            </div>
+        </section>
+
+        <section id="inventarioSection" class="section">
+            <h2>Inventario</h2>
+            <button class="primary" id="addInsumoBtn">Agregar Insumo</button>
+            <!-- Botón para registrar compras de insumos. Permite ingresar nuevas unidades y su costo -->
+            <button class="primary" id="addCompraBtn" style="margin-left:0.5rem;">Registrar Compra</button>
+            <div id="inventarioList"></div>
+        </section>
+
+        <section id="productosSection" class="section">
+            <h2>Productos</h2>
+            <button class="primary" id="addProductoBtn">Agregar Producto</button>
+            <div id="productosList"></div>
+
+            <!-- Nuevo card para ingresos brutos y netos por producto -->
+            <div class="card">
+                <h3>Ingresos por Producto</h3>
+                <div id="ingresosPorProductoList"></div>
+            </div>
+        </section>
+
+        <section id="analisisSection" class="section">
+            <h2>Análisis</h2>
+            <!-- Resumen del día/semana/mes/año -->
+            <div class="card">
+                <h3>Resumen Financiero</h3>
+                <p id="resumenDia">Cargando...</p>
+                <p id="resumenSemana"></p>
+                <p id="resumenMes"></p>
+                <p id="resumenAnio"></p>
+                <button class="primary" id="toggleAuditoriaBtn">Ver Detalles de Cálculo</button>
+                <pre id="auditoriaDetalles" style="display:none; white-space: pre-wrap; background-color:#181818; padding:1rem; border-radius:4px;"></pre>
+            </div>
+            <!-- Rentabilidad por producto -->
+            <div class="card">
+                <h3>Rentabilidad por Producto</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Precio</th>
+                            <th>COGS</th>
+                            <th>Ganancia Bruta</th>
+                            <th>Margen %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRentabilidad"></tbody>
+                </table>
+            </div>
+            <!-- Valoración simplificada -->
+            <div class="card">
+                <h3>Valoración Estimada del Negocio</h3>
+                <p id="valoracionNegocio">Cargando...</p>
+            </div>
+        </section>
+
+        <section id="configSection" class="section">
+            <h2>Configuración</h2>
+            <div class="card">
+                <h3>Datos Generales</h3>
+                <label>Nombre del Negocio
+                    <input type="text" id="cfgNombreNegocio" placeholder="Nombre de tu negocio">
+                </label>
+                <label>Moneda (texto)
+                    <input type="text" id="cfgMoneda" placeholder="Soles, Pesos, etc.">
+                </label>
+                <label>Símbolo de Moneda
+                    <input type="text" id="cfgSimbolo" placeholder="$, S/., €">
+                </label>
+                <button class="primary" id="saveConfigBtn">Guardar Configuración</button>
+            </div>
+            <div class="card">
+                <h3>Gastos Fijos</h3>
+                <label>Alquiler
+                    <input type="number" id="gastoFijoAlquiler" placeholder="0" min="0">
+                </label>
+                <label>Luz
+                    <input type="number" id="gastoFijoLuz" placeholder="0" min="0">
+                </label>
+                <label>Gas
+                    <input type="number" id="gastoFijoGas" placeholder="0" min="0">
+                </label>
+                <label>Agua
+                    <input type="number" id="gastoFijoAgua" placeholder="0" min="0">
+                </label>
+                <button class="primary" id="saveGastosFijosBtn">Guardar Gastos Fijos</button>
+            </div>
+            <div class="card">
+                <h3>Porcentaje de Impuesto (%)</h3>
+                <label>
+                    <input type="number" id="cfgImpuesto" placeholder="0" min="0" max="100">
+                </label>
+                <button class="primary" id="saveImpuestoBtn">Guardar Impuesto</button>
+            </div>
+
+            <!-- Control de pantalla completa -->
+            <div class="card">
+                <h3>Pantalla Completa</h3>
+                <p>Puedes activar el modo pantalla completa para trabajar con mayor comodidad. Cuando esté activo aparecerá un botón de salida en la esquina superior.</p>
+                <button class="primary" id="enterFullscreenBtn">Activar Pantalla Completa</button>
+            </div>
+
+            <!-- Exportar / Importar datos JSON -->
+            <div class="card">
+                <h3>Exportar/Importar Datos</h3>
+                <p>Puedes respaldar tus datos en un archivo <strong>save.json</strong> o restaurar un respaldo. Al importar se te preguntará si deseas fusionar o reemplazar los datos existentes.</p>
+                <!-- Botón para exportar todos los datos a un archivo único llamado save.json -->
+                <button class="primary" id="exportDataBtn">Guardar Datos (save.json)</button>
+                <input type="file" id="importDataInput" accept=".json" style="display:none;" />
+                <!-- Botón para importar datos desde un archivo save.json -->
+                <button class="primary" id="importDataBtn">Importar Datos</button>
+            </div>
+        </section>
+
+        <!-- Nueva sección de Finanzas -->
+        <section id="finanzasSection" class="section">
+            <h2>Finanzas y Caja</h2>
+            <div class="card">
+                <h3>Resumen de Saldos</h3>
+                <p id="finanzasSaldo">Cargando...</p>
+            </div>
+            <div class="card">
+                <h3>Ingresos y Gastos</h3>
+                <p id="finanzasResumenDia"></p>
+                <p id="finanzasResumenSemana"></p>
+                <p id="finanzasResumenMes"></p>
+            </div>
+            <div class="card">
+                <h3>Historial de Movimientos</h3>
+                <div id="finanzasHistorial" style="max-height:60vh; overflow-y:auto;"></div>
+            </div>
+        </section>
+
+        <!-- Nueva sección de Gastos -->
+        <section id="gastosSection" class="section">
+            <h2>Gastos</h2>
+            <div class="card">
+                <h3>Resumen por Categoría</h3>
+                <div id="gastosResumenCategorias">Cargando...</div>
+            </div>
+            <div class="card">
+                <h3>Lista de Gastos</h3>
+                <button class="primary" id="addGastoFromGastosBtn">Registrar Gasto</button>
+                <div id="gastosListaCompleta" style="max-height:60vh; overflow-y:auto;"></div>
+            </div>
+        </section>
+
+        <!-- Nueva sección de Logística -->
+        <section id="logisticaSection" class="section">
+            <h2>Logística</h2>
+            <div class="card">
+                <h3>Resumen Logístico</h3>
+                <p id="logisticaResumen">Cargando...</p>
+            </div>
+            <div class="card">
+                <h3>Registro de Eventos de Entrega</h3>
+                <button class="primary" id="addLogisticaBtn">Registrar Entrega</button>
+                <div id="logisticaList" style="max-height:60vh; overflow-y:auto;"></div>
+            </div>
+        </section>
+
+        <!-- Nueva sección de Empleados y Nómina -->
+        <section id="empleadosSection" class="section">
+            <h2>Empleados</h2>
+            <div class="card">
+                <h3>Listado de Empleados</h3>
+                <button class="primary" id="addEmpleadoBtn">Agregar Empleado</button>
+                <div id="empleadosList"></div>
+            </div>
+            <div class="card">
+                <h3>Resumen de Nómina</h3>
+                <p id="nominaResumen">Cargando...</p>
+            </div>
+        </section>
+
+        <!-- Nueva sección de Clientes -->
+        <section id="clientesSection" class="section">
+            <h2>Clientes</h2>
+            <div class="card">
+                <h3>Listado de Clientes</h3>
+                <p id="clientesResumen">Cargando...</p>
+                <div id="clientesList"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modales: Insumo, Producto, Venta, Gasto, Historial, Mis Datos, Borrar, Ayuda, Acerca de -->
+    <!-- Modal Insumo -->
+    <div id="insumoModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('insumoModal')">×</button>
+            <h2>Agregar/Editar Insumo</h2>
+            <label>Nombre del Producto
+                <input type="text" id="insNombre">
+            </label>
+            <label>Categoría
+                <!-- La categoría determina las unidades permitidas -->
+                <select id="insCategoria">
+                    <option value="otro">Otro</option>
+                    <option value="carne">Carne</option>
+                    <option value="liquido">Líquido</option>
+                    <option value="panqueso">Pan/Queso</option>
+                    <option value="papas">Papas</option>
+                </select>
+            </label>
+            <label>Unidad de Medida
+                <select id="insUnidad">
+                    <!-- Las opciones se ajustarán dinámicamente según la categoría -->
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                    <option value="l">l</option>
+                    <option value="ml">ml</option>
+                    <option value="unidad">unidad</option>
+                    <option value="rebanada">rebanada</option>
+                </select>
+            </label>
+            <label>Contenido del Paquete
+                <input type="number" id="insContenido" min="0" step="0.01">
+            </label>
+            <label>Precio Total de Compra
+                <input type="number" id="insPrecio" min="0" step="0.01">
+            </label>
+            <label>% Impuesto de Compra
+                <input type="number" id="insImpuesto" min="0" max="100" step="0.01">
+            </label>
+            <label>% Merma
+                <input type="number" id="insMerma" min="0" max="100" step="0.01">
+            </label>
+            <label>Stock Actual
+                <input type="number" id="insStock" min="0" step="0.01" placeholder="Cantidad disponible">
+            </label>
+            <button class="primary" id="saveInsumoBtn">Guardar Insumo</button>
+        </div>
+    </div>
+    <!-- Modal Producto -->
+    <div id="productoModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('productoModal')">×</button>
+            <h2>Agregar/Editar Producto</h2>
+            <label>Nombre del Producto
+                <input type="text" id="prodNombre">
+            </label>
+            <label>Precio de Venta
+                <input type="number" id="prodPrecio" min="0" step="0.01">
+            </label>
+            <div id="prodIngredientesContainer"></div>
+            <button class="primary" id="addIngredienteBtn" type="button">Agregar Ingrediente</button>
+            <button class="primary" id="saveProductoBtn">Guardar Producto</button>
+        </div>
+    </div>
+
+    <!-- Datalist for insumo suggestions -->
+    <datalist id="insumosDatalist"></datalist>
+    <!-- Modal Venta -->
+    <div id="ventaModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('ventaModal')">×</button>
+            <h2>Registrar Venta</h2>
+            <label>Producto
+                <!-- Campo con búsqueda y sugerencias automáticas para productos registrados -->
+                <input type="text" id="ventaProductoInput" list="productosDatalist" placeholder="Buscar producto...">
+                <!-- Datalist con las opciones de productos disponibles, se llenará dinámicamente -->
+                <datalist id="productosDatalist"></datalist>
+            </label>
+            <label>Cantidad
+                <input type="number" id="ventaCantidad" min="1" step="1" value="1">
+            </label>
+            <label>Precio de Venta (por unidad o total)
+                <input type="number" id="ventaPrecio" min="0" step="0.01">
+            </label>
+            <label>Forma de Pago
+                <select id="ventaPago">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="cashapp">CashApp</option>
+                    <option value="zelle">Zelle</option>
+                    <option value="venmo">Venmo</option>
+                </select>
+            </label>
+            <fieldset style="border:1px solid #333; padding:0.5rem; margin-top:0.5rem;">
+                <legend style="padding:0 0.5rem;">Cliente (opcional)</legend>
+                <label>Nombre
+                    <input type="text" id="ventaClienteNombre" placeholder="Nombre del cliente">
+                </label>
+                <label>Teléfono
+                    <input type="text" id="ventaClienteTelefono" placeholder="Teléfono del cliente">
+                </label>
+                <label>Email
+                    <input type="email" id="ventaClienteEmail" placeholder="Correo del cliente">
+                </label>
+            </fieldset>
+            <label>Tipo de Servicio
+                <select id="ventaServicio">
+                    <option value="llevar">Para llevar</option>
+                    <option value="aqui">Para aquí</option>
+                    <option value="delivery">Delivery</option>
+                </select>
+            </label>
+            <label id="mesaLabel" style="display:none;">Número de Mesa
+                <input type="text" id="ventaMesa">
+            </label>
+            <!-- Detalles adicionales para pedidos de Delivery -->
+            <div id="deliveryDetails" style="display:none; border:1px solid #333; padding:0.5rem; margin-top:0.5rem;">
+                <h4>Detalles de Delivery</h4>
+                <label>Dirección de entrega
+                    <input type="text" id="ventaDireccion" placeholder="Dirección de entrega">
+                </label>
+                <label>Distancia (km)
+                    <input type="number" id="ventaDistancia" min="0" step="0.01">
+                </label>
+                <label>Tiempo (minutos) (opcional)
+                    <input type="number" id="ventaTiempo" min="0" step="1">
+                </label>
+                <label>Costo de transporte
+                    <input type="number" id="ventaCosto" min="0" step="0.01">
+                </label>
+                <label>Transporte
+                    <select id="ventaTransporte">
+                        <option value="mio">Mi negocio</option>
+                        <option value="cliente">Cliente</option>
+                    </select>
+                </label>
+            </div>
+            <button class="primary" id="saveVentaBtn">Guardar Venta</button>
+        </div>
+    </div>
+    <!-- Modal Gasto -->
+    <div id="gastoModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('gastoModal')">×</button>
+            <h2>Registrar Gasto</h2>
+            <label>Descripción
+                <input type="text" id="gastoDesc">
+            </label>
+            <label>Monto
+                <input type="number" id="gastoMonto" min="0" step="0.01">
+            </label>
+            <label>Categoría
+                <input type="text" id="gastoCategoria" placeholder="Insumos, Transporte, Marketing...">
+            </label>
+        <!-- Permite seleccionar un insumo del inventario para registrar consumo directo -->
+        <label>Insumo (opcional)
+            <select id="gastoInsumoSelect">
+                <option value="">-- Seleccionar insumo --</option>
+            </select>
+        </label>
+        <label>Cantidad del insumo (si aplica)
+            <input type="number" id="gastoInsumoCantidad" min="0" step="0.01" placeholder="0">
+        </label>
+        <p id="gastoInsumoCosto" style="font-size:0.8rem; color:#aaa;"></p>
+        <!-- Permite seleccionar un producto final para registrar consumo o ajuste -->
+        <label>Producto (opcional)
+            <input type="text" id="gastoProductoInput" list="gastoProductosDatalist" placeholder="Buscar producto...">
+            <datalist id="gastoProductosDatalist"></datalist>
+        </label>
+        <label>Cantidad del producto (si aplica)
+            <input type="number" id="gastoProductoCantidad" min="0" step="1" placeholder="0">
+        </label>
+        <p id="gastoProductoCosto" style="font-size:0.8rem; color:#aaa;"></p>
+            <button class="primary" id="saveGastoBtn">Guardar Gasto</button>
+        </div>
+    </div>
+
+    <!-- Modal Recibo -->
+    <div id="receiptModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('receiptModal')">×</button>
+            <h2>Recibo</h2>
+            <div id="receiptContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Logística -->
+    <div id="logisticaModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('logisticaModal')">×</button>
+            <h2>Registrar Entrega / Logística</h2>
+            <label>Fecha de la Venta
+                <input type="date" id="logisticaFecha">
+            </label>
+            <label>Venta asociada (producto)
+                <select id="logisticaVenta">
+                    <!-- Se llenará dinámicamente con las ventas del día seleccionado -->
+                </select>
+            </label>
+            <label>Distancia (km)
+                <input type="number" id="logisticaDistancia" min="0" step="0.01">
+            </label>
+            <label>Tiempo (minutos)
+                <input type="number" id="logisticaTiempo" min="0" step="1">
+            </label>
+            <label>Transporte
+                <select id="logisticaTransporte">
+                    <option value="mio">Mi negocio</option>
+                    <option value="cliente">Cliente</option>
+                </select>
+            </label>
+            <label>Costo total de logística
+                <input type="number" id="logisticaCosto" min="0" step="0.01">
+            </label>
+            <button class="primary" id="saveLogisticaBtn">Guardar Logística</button>
+        </div>
+    </div>
+
+    <!-- Modal Compra de Insumo -->
+    <!--
+        Este modal se usa para registrar compras adicionales de insumos ya
+        existentes. Permite seleccionar el insumo, la cantidad adquirida
+        y el precio total pagado (antes de impuestos). El impuesto
+        aplicable también se puede especificar para ajustar el valor
+        final de la compra. Al guardar, el stock del insumo se aumenta
+        y se registra un gasto en las transacciones del día.
+    -->
+    <div id="compraModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('compraModal')">×</button>
+            <h2>Registrar Compra de Insumo</h2>
+            <label>Insumo a comprar
+                <select id="compraInsumo"></select>
+            </label>
+            <label>Cantidad adquirida
+                <input type="number" id="compraCantidad" min="0" step="0.01" placeholder="0">
+            </label>
+            <label>Precio total de compra
+                <input type="number" id="compraCosto" min="0" step="0.01" placeholder="0">
+            </label>
+            <label>% Impuesto aplicado
+                <input type="number" id="compraImpuesto" min="0" max="100" step="0.01" placeholder="0">
+            </label>
+            <button class="primary" id="saveCompraBtn">Guardar Compra</button>
+        </div>
+    </div>
+    <!-- Modal Historial -->
+    <div id="historialModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('historialModal')">×</button>
+            <h2>Historial Completo</h2>
+            <div id="historialContent" style="max-height:60vh; overflow-y:auto;"></div>
+        </div>
+    </div>
+    <!-- Modal Mis Datos -->
+    <div id="misDatosModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('misDatosModal')">×</button>
+            <h2>Mis Datos</h2>
+            <div id="misDatosContent"></div>
+        </div>
+    </div>
+    <!-- Modal Borrar Datos -->
+    <div id="borrarModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('borrarModal')">×</button>
+            <h2>Borrar Todos Mis Datos</h2>
+            <p>¿ESTÁS SEGURO? Esta acción es IRREVERSIBLE y borrará permanentemente toda la información del negocio, incluyendo inventario, ventas, gastos y configuración de este navegador.</p>
+            <label>Escribe "BORRAR" para confirmar
+                <input type="text" id="confirmDeleteInput">
+            </label>
+            <button class="secondary" id="confirmDeleteBtn">Borrar</button>
+        </div>
+    </div>
+    <!-- Modal Ayuda -->
+    <div id="ayudaModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('ayudaModal')">×</button>
+            <h2>Ayuda / Cómo Funciona</h2>
+            <div style="max-height:60vh; overflow-y:auto;">
+                <!-- Aquí insertaremos la ayuda generada manualmente -->
+                <p><strong>Introducción:</strong> Esta aplicación te ayuda a controlar tu negocio de comida registrando insumos, recetas, ventas, gastos y logística, con análisis detallados. Navega entre secciones mediante la barra inferior.</p>
+                <p><strong>Inventario:</strong> Añade insumos con su unidad, contenido, precio, impuesto y merma. La app calcula el costo unitario real. Además, puedes registrar <em>compras</em> de insumos existentes para aumentar el stock y actualizar el costo promedio. Cada compra registra automáticamente un gasto en la categoría "Compra Inventario" para que el análisis financiero sea más fiel.</p>
+                <p><strong>Productos:</strong> Define tus recetas seleccionando insumos y cantidades. Establece un precio de venta y la app calculará el costo de preparación para comparar con el precio de venta.</p>
+                <p><strong>Operación:</strong> Selecciona la fecha para registrar ventas y gastos. Cada venta se vincula a un producto y puede indicar tipo de servicio y mesa. Los gastos variables se clasifican por categoría.</p>
+                <p><strong>Finanzas:</strong> Consulta el resumen de saldos en efectivo y banco, los ingresos y gastos diarios, semanales y mensuales, así como un historial de movimientos.</p>
+                <p><strong>Ventas avanzadas:</strong> Al registrar una venta puedes especificar la cantidad, el método de pago y los datos del cliente. Tras guardar la venta se muestra un recibo automático con el desglose del precio de venta, el costo estimado de ingredientes y preparación, el costo de servicio y el total a pagar.</p>
+                <p><strong>Análisis:</strong> Consulta el resumen financiero diario, semanal, mensual y anual. Revisa la rentabilidad por producto y la valoración aproximada de tu negocio. Usa el botón para ver detalles de cálculo.</p>
+                <p><strong>Gastos:</strong> En la sección Gastos verás un resumen por categoría de todos tus egresos (variables, fijos y logística) y una lista de cada movimiento. Desde allí puedes registrar un nuevo gasto rápidamente.</p>
+                <p><strong>Logística:</strong> La sección Logística te permite registrar entregas a domicilio: selecciona la venta, añade distancia, tiempo, quién realiza el transporte y el costo. Ese costo se registra como un gasto automático y podrás ver si cada entrega fue rentable o no.</p>
+                <p><strong>Empleados:</strong> Gestiona tus empleados, asigna roles, registra su salario por hora y las horas trabajadas en el periodo actual. La aplicación calcula el costo total de nómina y lo incluye en los análisis financieros. Desde aquí puedes editar o eliminar empleados.</p>
+                <p><strong>Clientes:</strong> La sección de Clientes se actualiza automáticamente cuando registras ventas con datos del cliente. Se acumula el gasto total y el número de visitas de cada cliente, permitiéndote analizar quiénes son los clientes más frecuentes y de mayor gasto. No necesitas registrar clientes manualmente: solo introduce nombre, teléfono o correo al registrar una venta.</p>
+                <p><strong>Configuración:</strong> Define el nombre del negocio, moneda, símbolo y el porcentaje de impuestos. También registra gastos fijos para prorratearlos automáticamente.</p>
+                <p><strong>Historial:</strong> Accede al historial para ver todas tus transacciones (ventas, gastos, compras de insumos, registros logísticos), editable en cualquier momento.</p>
+                <p><strong>Mis Datos:</strong> Visualiza un resumen de tus datos almacenados: número de insumos, productos, fechas de la primera y última transacción y tamaño estimado de almacenamiento.</p>
+                <p><strong>Borrar Datos:</strong> Usa esta opción con precaución para limpiar todo el almacenamiento y comenzar de cero.</p>
+                <p><strong>Acerca de:</strong> Muestra información de la aplicación y créditos.</p>
+                <p>Para más detalles, consulta la documentación o contacta al desarrollador.</p>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Acerca de -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('aboutModal')">×</button>
+            <h2>Acerca de</h2>
+            <p>Gestor Avanzado de Negocio v1.0</p>
+            <p>Creado por IA con tecnologías web modernas.</p>
+            <p>Esta aplicación es de código abierto y está destinada a fines educativos y de ejemplo.</p>
+        </div>
+    </div>
+
+    <!-- Modal Empleado -->
+    <div id="empleadoModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="toggleModal('empleadoModal')">×</button>
+            <h2>Agregar/Editar Empleado</h2>
+            <label>Nombre
+                <input type="text" id="empNombre" placeholder="Nombre del empleado">
+            </label>
+            <label>Rol
+                <select id="empRol">
+                    <option value="cajero">Cajero</option>
+                    <option value="cocinero">Cocinero</option>
+                    <option value="ayudante">Ayudante</option>
+                    <option value="repartidor">Repartidor</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </label>
+            <label>Salario por Hora
+                <input type="number" id="empSalarioHora" min="0" step="0.01" placeholder="0">
+            </label>
+            <label>Horas trabajadas (periodo actual)
+                <input type="number" id="empHoras" min="0" step="0.1" placeholder="0">
+            </label>
+            <button class="primary" id="saveEmpleadoBtn">Guardar Empleado</button>
+        </div>
+    </div>
+
+    <!-- Contenedor de notificaciones (Toast) -->
+    <div id="toast"></div>
+
+        <nav>
+        <!-- Añadimos iconos para mejorar jerarquía visual -->
+        <button id="navOperacion" class="active">🧾 Operación</button>
+        <button id="navInventario">📦 Inventario</button>
+        <button id="navProductos">🍔 Productos</button>
+        <button id="navAnalisis">📊 Análisis</button>
+        <button id="navConfig">⚙️ Configuración</button>
+        <button id="navFinanzas">💵 Finanzas</button>
+        <!-- Nuevas secciones para gastos y logística -->
+        <button id="navGastos">💸 Gastos</button>
+        <button id="navLogistica">🚚 Logística</button>
+        <!-- Nueva sección para empleados -->
+        <button id="navEmpleados">👥 Empleados</button>
+        <!-- Nueva sección para clientes -->
+        <button id="navClientes">🧑‍🤝‍🧑 Clientes</button>
+        <!-- Nueva entrada para historial -->
+        <button id="navHistorial">📜 Historial</button>
+    </nav>
+
+        <!-- Botón flotante para salir de pantalla completa -->
+        <button id="exitFullscreenBtn" style="position:fixed; top:0.5rem; right:0.5rem; display:none; z-index:2001; padding:0.5rem; border:none; border-radius:4px; background:#f44336; color:#fff; cursor:pointer;">Salir Pantalla Completa</button>
+
+    <script>
+        /***********************************************************************
+         *  Modelo de Datos y utilidades
+         *
+         * La aplicación organiza la información en objetos de localStorage
+         * según se especifica en el prompt. Las funciones de carga y
+         * guardado centralizan el acceso a estos objetos y garantizan que
+         * cualquier cambio se persista de inmediato. Se proporciona una
+         * estructura básica de datos con predeterminados mínimos para que
+         * la aplicación funcione aunque localStorage esté vacío.
+         ***********************************************************************/
+
+        const StorageKeys = {
+            config: 'configuracionGeneral',
+            inventario: 'inventario',
+            productos: 'productosFinales',
+            transacciones: 'transaccionesDiarias',
+            ingresosExternos: 'ingresosExternos',
+            activos: 'activos',
+            logistica: 'logistica',
+            gastosFijos: 'gastosFijos',
+            impuesto: 'impuestoPorcentaje',
+            // Sección de empleados (nómina)
+            empleados: 'empleados'
+            ,clientes: 'clientes'
+        };
+
+        function getData(key) {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : null;
+        }
+
+        function setData(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+        function initStorage() {
+            if (!getData(StorageKeys.config)) {
+                setData(StorageKeys.config, { nombreNegocio: 'Mi Negocio', moneda: 'Soles', simboloMoneda: 'S/' });
+            }
+            if (!getData(StorageKeys.inventario)) {
+                setData(StorageKeys.inventario, []);
+            }
+            if (!getData(StorageKeys.productos)) {
+                setData(StorageKeys.productos, []);
+            }
+            if (!getData(StorageKeys.transacciones)) {
+                setData(StorageKeys.transacciones, {});
+            }
+            if (!getData(StorageKeys.ingresosExternos)) {
+                setData(StorageKeys.ingresosExternos, []);
+            }
+            if (!getData(StorageKeys.activos)) {
+                setData(StorageKeys.activos, []);
+            }
+            if (!getData(StorageKeys.logistica)) {
+                setData(StorageKeys.logistica, []);
+            }
+            if (!getData(StorageKeys.gastosFijos)) {
+                setData(StorageKeys.gastosFijos, { alquiler:0, luz:0, gas:0, agua:0 });
+            }
+            if (!getData(StorageKeys.impuesto)) {
+                setData(StorageKeys.impuesto, 0);
+            }
+            // Inicializar empleados si no existe
+            if (!getData(StorageKeys.empleados)) {
+                setData(StorageKeys.empleados, []);
+            }
+            if (!getData(StorageKeys.clientes)) {
+                setData(StorageKeys.clientes, []);
+            }
+        }
+
+        // Genera una marca de tiempo en formato YYYY-MM-DD HH:mm:ss
+        function timestamp() {
+            const now = new Date();
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        }
+
+        // Obtener clave de fecha YYYY-MM-DD para transacciones
+        function dateKey(dateStr) {
+            const d = new Date(dateStr);
+            if (isNaN(d)) return null;
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        }
+
+        /************************************************************************
+         *    UI/UX helpers: Toasts, Device detection, Responsive adjustments,
+         *    Empty states y KPIs
+         ***********************************************************************/
+
+        // Mostrar notificaciones tipo toast en la parte inferior. Tipo puede ser
+        // 'info', 'success' o 'error' para cambiar el color de fondo.
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            let bg = '#323232';
+            if (type === 'success') bg = '#4caf50';
+            if (type === 'error') bg = '#f44336';
+            toast.style.backgroundColor = bg;
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            clearTimeout(window.__toastTimer);
+            window.__toastTimer = setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 3000);
+        }
+
+        // Detecta el dispositivo basándose en userAgent. Valores posibles:
+        // 'Android', 'iOS', 'Windows Phone', 'Desktop'.
+        let detectedDevice = 'Desktop';
+        function detectDevice() {
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            if (/android/i.test(ua)) detectedDevice = 'Android';
+            else if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) detectedDevice = 'iOS';
+            else if (/windows phone/i.test(ua)) detectedDevice = 'Windows Phone';
+            else detectedDevice = 'Desktop';
+            return detectedDevice;
+        }
+        // Ajusta tamaño de botones de navegación según el ancho de la pantalla y tipo de dispositivo.
+        function adjustForDevice() {
+            const width = window.innerWidth;
+            const navButtons = document.querySelectorAll('nav button');
+            if (width < 600 || detectedDevice !== 'Desktop') {
+                navButtons.forEach(btn => {
+                    btn.style.fontSize = '0.9rem';
+                    btn.style.padding = '0.75rem 0.25rem';
+                });
+            } else {
+                navButtons.forEach(btn => {
+                    btn.style.fontSize = '';
+                    btn.style.padding = '';
+                });
+            }
+        }
+
+        // Inserta un mensaje cuando un contenedor no tiene elementos.
+        function showEmptyList(container, message) {
+            if (container.children.length === 0) {
+                const p = document.createElement('p');
+                p.className = 'empty-state';
+                p.textContent = message;
+                container.appendChild(p);
+            }
+        }
+
+        // Actualiza los indicadores clave de la operación diaria (ingresos, gastos,
+        // utilidad y ticket promedio) usando los datos de la fecha seleccionada.
+        function updateKpis(key, trx) {
+            const cfg = getData(StorageKeys.config);
+            const ventas = trx.ventas || [];
+            const gastosVars = trx.gastos || [];
+            const gastosOps = trx.gastosOperativos || [];
+            let ingresos = 0;
+            let gastos = 0;
+            let cogsTotal = 0;
+            ventas.forEach(v => {
+                ingresos += v.precio;
+                cogsTotal += v.cogs;
+            });
+            gastosVars.forEach(g => gastos += g.monto);
+            gastosOps.forEach(g => gastos += g.monto);
+            const util = ingresos - cogsTotal - gastos;
+            const ticketProm = ventas.length ? (ingresos / ventas.length) : 0;
+            document.getElementById('kpiIngresosHoy').textContent = cfg.simboloMoneda + ' ' + ingresos.toFixed(2);
+            document.getElementById('kpiGastosHoy').textContent = cfg.simboloMoneda + ' ' + gastos.toFixed(2);
+            document.getElementById('kpiUtilidadHoy').textContent = cfg.simboloMoneda + ' ' + util.toFixed(2);
+            document.getElementById('kpiTicketPromHoy').textContent = cfg.simboloMoneda + ' ' + ticketProm.toFixed(2);
+        }
+
+        // Permitir cerrar cualquier modal activo pulsando Esc
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active').forEach(mod => mod.classList.remove('active'));
+            }
+        });
+
+        /************************************************************************
+         *      Funciones de interfaz de usuario y navegación
+         ***********************************************************************/
+        document.addEventListener('DOMContentLoaded', () => {
+            initStorage();
+            loadConfigUI();
+            // Detectar dispositivo y ajustar la interfaz inicialmente
+            detectDevice();
+            adjustForDevice();
+            // Ajustar de nuevo si cambia el tamaño de la ventana
+            window.addEventListener('resize', adjustForDevice);
+            refreshInventarioList();
+            refreshProductosList();
+            refreshOperacionesUI();
+            refreshAnalisis();
+            refreshEmpleados();
+            refreshClientes();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Navegación inferior
+            document.getElementById('navOperacion').addEventListener('click', () => showSection('operacionSection'));
+            document.getElementById('navInventario').addEventListener('click', () => showSection('inventarioSection'));
+            document.getElementById('navProductos').addEventListener('click', () => showSection('productosSection'));
+            document.getElementById('navAnalisis').addEventListener('click', () => showSection('analisisSection'));
+            document.getElementById('navConfig').addEventListener('click', () => showSection('configSection'));
+            document.getElementById('navFinanzas').addEventListener('click', () => showSection('finanzasSection'));
+            // Nuevas secciones: Gastos y Logística
+            document.getElementById('navGastos').addEventListener('click', () => showSection('gastosSection'));
+            document.getElementById('navLogistica').addEventListener('click', () => showSection('logisticaSection'));
+            // Navegar a la sección de empleados
+            document.getElementById('navEmpleados').addEventListener('click', () => showSection('empleadosSection'));
+            // Navegar a la sección de clientes
+            document.getElementById('navClientes').addEventListener('click', () => showSection('clientesSection'));
+
+            // Navegar al historial desde la barra inferior
+            document.getElementById('navHistorial').addEventListener('click', () => {
+                // Mostrar modal de historial directamente para facilitar navegación
+                populateHistorial();
+                toggleModal('historialModal');
+            });
+
+            // Menú usuario
+            document.getElementById('userMenuBtn').addEventListener('click', () => {
+                const menu = document.getElementById('userMenu');
+                menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+            });
+            document.getElementById('menuHistory').addEventListener('click', () => { toggleModal('historialModal'); populateHistorial(); });
+            document.getElementById('menuMyData').addEventListener('click', () => { toggleModal('misDatosModal'); populateMisDatos(); });
+            document.getElementById('menuClearData').addEventListener('click', () => { toggleModal('borrarModal'); });
+            document.getElementById('menuHelp').addEventListener('click', () => { toggleModal('ayudaModal'); });
+            document.getElementById('menuAbout').addEventListener('click', () => { toggleModal('aboutModal'); });
+
+            // Operación diaria
+            document.getElementById('operacionDate').addEventListener('change', () => {
+                refreshOperacionesUI();
+            });
+                document.getElementById('addVentaBtn').addEventListener('click', () => {
+                // Reiniciar campos del modal de venta
+                const prodInput = document.getElementById('ventaProductoInput');
+                if (prodInput) prodInput.value = '';
+                document.getElementById('ventaPrecio').value = '';
+                document.getElementById('ventaServicio').value = 'llevar';
+                document.getElementById('ventaMesa').value = '';
+                document.getElementById('mesaLabel').style.display = 'none';
+                // Reset and ocultar detalles de delivery
+                document.getElementById('deliveryDetails').style.display = 'none';
+                document.getElementById('ventaDireccion').value = '';
+                document.getElementById('ventaDistancia').value = '';
+                document.getElementById('ventaTiempo').value = '';
+                document.getElementById('ventaCosto').value = '';
+                document.getElementById('ventaTransporte').value = 'mio';
+                // Populate datalist for productos
+                populateProductosDatalist();
+                toggleModal('ventaModal');
+            });
+                document.getElementById('addGastoBtn').addEventListener('click', () => {
+                    document.getElementById('gastoDesc').value = '';
+                    document.getElementById('gastoMonto').value = '';
+                    document.getElementById('gastoCategoria').value = '';
+                    document.getElementById('gastoInsumoSelect').value = '';
+                    document.getElementById('gastoInsumoCantidad').value = '';
+                    document.getElementById('gastoInsumoCosto').textContent = '';
+                // Reiniciar campos de producto en gasto
+                const prodInput = document.getElementById('gastoProductoInput');
+                const prodQty = document.getElementById('gastoProductoCantidad');
+                const prodCost = document.getElementById('gastoProductoCosto');
+                if (prodInput) prodInput.value = '';
+                if (prodQty) prodQty.value = '';
+                if (prodCost) prodCost.textContent = '';
+                    populateGastoInsumos();
+                    toggleModal('gastoModal');
+                });
+                document.getElementById('ventaServicio').addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    // Mostrar campo de mesa solo para servicio en el local
+                    document.getElementById('mesaLabel').style.display = val === 'aqui' ? 'block' : 'none';
+                    // Mostrar detalles de delivery sólo si es delivery
+                    document.getElementById('deliveryDetails').style.display = val === 'delivery' ? 'block' : 'none';
+                });
+            document.getElementById('saveVentaBtn').addEventListener('click', saveVenta);
+            document.getElementById('saveGastoBtn').addEventListener('click', saveGasto);
+
+            // Actualiza las unidades cuando se abre el modal de insumo por primera vez
+            document.getElementById('addInsumoBtn').addEventListener('click', () => {
+                updateUnidadOptions();
+            });
+
+            // Insumo: cambiar unidades según categoría
+            document.getElementById('insCategoria').addEventListener('change', updateUnidadOptions);
+
+            // Gastos section: botón para abrir modal gasto
+                document.getElementById('addGastoFromGastosBtn').addEventListener('click', () => {
+                    // Reutilizamos el modal de gasto existente
+                    document.getElementById('gastoDesc').value = '';
+                    document.getElementById('gastoMonto').value = '';
+                    document.getElementById('gastoCategoria').value = '';
+                    document.getElementById('gastoInsumoSelect').value = '';
+                    document.getElementById('gastoInsumoCantidad').value = '';
+                    document.getElementById('gastoInsumoCosto').textContent = '';
+                // Reiniciar campos de producto en gasto
+                const prodInput2 = document.getElementById('gastoProductoInput');
+                const prodQty2 = document.getElementById('gastoProductoCantidad');
+                const prodCost2 = document.getElementById('gastoProductoCosto');
+                if (prodInput2) prodInput2.value = '';
+                if (prodQty2) prodQty2.value = '';
+                if (prodCost2) prodCost2.textContent = '';
+                    populateGastoInsumos();
+                    toggleModal('gastoModal');
+                });
+
+            // Logística: abrir modal
+            document.getElementById('addLogisticaBtn').addEventListener('click', () => {
+                // Inicializar fecha con hoy
+                const hoy = new Date();
+                const pad = (n) => n.toString().padStart(2, '0');
+                const todayStr = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
+                document.getElementById('logisticaFecha').value = todayStr;
+                populateVentasLogistica(todayStr);
+                document.getElementById('logisticaDistancia').value = '';
+                document.getElementById('logisticaTiempo').value = '';
+                document.getElementById('logisticaCosto').value = '';
+                document.getElementById('logisticaTransporte').value = 'mio';
+                toggleModal('logisticaModal');
+            });
+            document.getElementById('logisticaFecha').addEventListener('change', (e) => {
+                populateVentasLogistica(e.target.value);
+            });
+            document.getElementById('saveLogisticaBtn').addEventListener('click', saveLogistica);
+
+            // Inventario
+            document.getElementById('addInsumoBtn').addEventListener('click', () => {
+                // Limpiar campos del modal de insumo
+                document.getElementById('insNombre').value = '';
+                document.getElementById('insUnidad').value = 'kg';
+                document.getElementById('insContenido').value = '';
+                document.getElementById('insPrecio').value = '';
+                document.getElementById('insImpuesto').value = '';
+                document.getElementById('insMerma').value = '';
+                document.getElementById('saveInsumoBtn').dataset.index = '';
+                toggleModal('insumoModal');
+            });
+            // Registrar compra
+            document.getElementById('addCompraBtn').addEventListener('click', () => {
+                // Rellenar la lista de insumos disponibles
+                populateCompraInsumos();
+                // Limpiar campos
+                document.getElementById('compraCantidad').value = '';
+                document.getElementById('compraCosto').value = '';
+                document.getElementById('compraImpuesto').value = '';
+                toggleModal('compraModal');
+            });
+            document.getElementById('saveCompraBtn').addEventListener('click', saveCompra);
+            document.getElementById('saveInsumoBtn').addEventListener('click', saveInsumo);
+
+            // Productos
+            document.getElementById('addProductoBtn').addEventListener('click', () => {
+                resetProductoModal();
+                toggleModal('productoModal');
+            });
+            document.getElementById('addIngredienteBtn').addEventListener('click', addIngredienteField);
+            document.getElementById('saveProductoBtn').addEventListener('click', saveProducto);
+
+            // Configuración
+            document.getElementById('saveConfigBtn').addEventListener('click', saveConfiguracion);
+            document.getElementById('saveGastosFijosBtn').addEventListener('click', saveGastosFijos);
+            document.getElementById('saveImpuestoBtn').addEventListener('click', saveImpuesto);
+
+            // Empleados
+            document.getElementById('addEmpleadoBtn').addEventListener('click', () => {
+                // Limpiar campos del modal
+                document.getElementById('empNombre').value = '';
+                document.getElementById('empRol').value = 'cajero';
+                document.getElementById('empSalarioHora').value = '';
+                document.getElementById('empHoras').value = '';
+                // Limpiar índice
+                document.getElementById('saveEmpleadoBtn').dataset.index = '';
+                toggleModal('empleadoModal');
+            });
+            document.getElementById('saveEmpleadoBtn').addEventListener('click', saveEmpleado);
+
+            // Borrar datos
+            document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+                const confirmVal = document.getElementById('confirmDeleteInput').value;
+                if (confirmVal === 'BORRAR') {
+                    localStorage.clear();
+                    showToast('Datos eliminados. Reiniciando aplicación...', 'success');
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Debes escribir BORRAR exactamente para confirmar.', 'error');
+                }
+            });
+
+            // Toggle auditoría
+            document.getElementById('toggleAuditoriaBtn').addEventListener('click', () => {
+                const pre = document.getElementById('auditoriaDetalles');
+                pre.style.display = pre.style.display === 'block' ? 'none' : 'block';
+            });
+
+            // Evento para calcular costo de insumo en gasto
+            document.getElementById('gastoInsumoSelect').addEventListener('change', updateGastoInsumoCost);
+            document.getElementById('gastoInsumoCantidad').addEventListener('input', updateGastoInsumoCost);
+
+            // Evento para calcular costo de producto en gasto (usar datalist input)
+            const prodInput = document.getElementById('gastoProductoInput');
+            const prodQty = document.getElementById('gastoProductoCantidad');
+            if (prodInput && prodQty) {
+                prodInput.addEventListener('input', updateGastoProductoCost);
+                prodQty.addEventListener('input', updateGastoProductoCost);
+            }
+
+            // Eventos para pantalla completa
+            const fullBtn = document.getElementById('enterFullscreenBtn');
+            if (fullBtn) {
+                fullBtn.addEventListener('click', toggleFullscreen);
+            }
+            const exitBtn = document.getElementById('exitFullscreenBtn');
+            if (exitBtn) {
+                exitBtn.addEventListener('click', toggleFullscreen);
+            }
+            document.addEventListener('fullscreenchange', () => {
+                const exitBtn = document.getElementById('exitFullscreenBtn');
+                if (document.fullscreenElement) {
+                    exitBtn.style.display = 'block';
+                    document.getElementById('enterFullscreenBtn').textContent = 'Salir de Pantalla Completa';
+                } else {
+                    exitBtn.style.display = 'none';
+                    document.getElementById('enterFullscreenBtn').textContent = 'Activar Pantalla Completa';
+                }
+            });
+
+            // Exportar / Importar datos
+            const exportBtn = document.getElementById('exportDataBtn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', exportData);
+            }
+            const importBtn = document.getElementById('importDataBtn');
+            const importInput = document.getElementById('importDataInput');
+            if (importBtn && importInput) {
+                importBtn.addEventListener('click', () => importInput.click());
+                importInput.addEventListener('change', (e) => importDataFile(e));
+            }
+        }
+
+        function showSection(sectionId) {
+            // Ocultar menú desplegable si está abierto
+            document.getElementById('userMenu').style.display = 'none';
+            // Mostrar sección deseada
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            // Actualizar navegación
+            document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+            if (sectionId === 'operacionSection') document.getElementById('navOperacion').classList.add('active');
+            if (sectionId === 'inventarioSection') document.getElementById('navInventario').classList.add('active');
+            if (sectionId === 'productosSection') document.getElementById('navProductos').classList.add('active');
+            if (sectionId === 'analisisSection') {
+                document.getElementById('navAnalisis').classList.add('active');
+                refreshAnalisis();
+            }
+            if (sectionId === 'finanzasSection') {
+                document.getElementById('navFinanzas').classList.add('active');
+                refreshFinanzas();
+            }
+            if (sectionId === 'gastosSection') {
+                document.getElementById('navGastos').classList.add('active');
+                refreshGastos();
+            }
+            if (sectionId === 'logisticaSection') {
+                document.getElementById('navLogistica').classList.add('active');
+                refreshLogistica();
+            }
+            if (sectionId === 'empleadosSection') {
+                document.getElementById('navEmpleados').classList.add('active');
+                refreshEmpleados();
+            }
+            if (sectionId === 'clientesSection') {
+                document.getElementById('navClientes').classList.add('active');
+                refreshClientes();
+            }
+            if (sectionId === 'configSection') document.getElementById('navConfig').classList.add('active');
+        }
+
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.toggle('active');
+        }
+
+        /************************************************************************
+         *    Exportar e Importar Datos
+         ***********************************************************************/
+        function exportData() {
+            // Recolectar todas las claves a exportar
+            const exportKeys = Object.values(StorageKeys);
+            const data = {};
+            exportKeys.forEach(k => {
+                data[k] = getData(k);
+            });
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            // Siempre exportar con un nombre fijo 'save.json'.
+            // De esta forma el usuario puede identificar fácilmente el archivo de respaldo
+            // y evita generar múltiples nombres con fecha y hora que complican el uso.
+            const fileName = 'save.json';
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Datos exportados correctamente.', 'success');
+        }
+
+        function importDataFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    // Validar que el archivo contiene al menos una clave conocida de StorageKeys
+                    let valid = false;
+                    for (const key in json) {
+                        if (Object.values(StorageKeys).includes(key)) {
+                            valid = true;
+                            break;
+                        }
+                    }
+                    if (!valid) {
+                        showToast('El archivo no contiene datos válidos.', 'error');
+                        return;
+                    }
+                    // Preguntar al usuario si desea fusionar o reemplazar los datos existentes.
+                    const merge = confirm('¿Deseas fusionar los datos importados con los existentes?\n\nSelecciona Aceptar para fusionar.\nSelecciona Cancelar para reemplazar todos los datos actuales.');
+                    if (merge) {
+                        // Combinar cada clave en lugar de sobrescribir totalmente.
+                        for (const key in json) {
+                            if (!json.hasOwnProperty(key)) continue;
+                            const importedValue = json[key];
+                            const existingValue = getData(key);
+                            if (Array.isArray(importedValue) && Array.isArray(existingValue)) {
+                                // Unir arrays concatenando; se podrían eliminar duplicados en el futuro si se desea.
+                                const mergedArray = existingValue.concat(importedValue);
+                                localStorage.setItem(key, JSON.stringify(mergedArray));
+                            } else if (typeof importedValue === 'object' && importedValue !== null && typeof existingValue === 'object' && existingValue !== null && !Array.isArray(existingValue)) {
+                                // Merge superficial de objetos: propiedades importadas sobrescriben las existentes.
+                                const mergedObj = Object.assign({}, existingValue, importedValue);
+                                localStorage.setItem(key, JSON.stringify(mergedObj));
+                            } else {
+                                // Para otros tipos (números, cadenas), reemplazar.
+                                localStorage.setItem(key, JSON.stringify(importedValue));
+                            }
+                        }
+                    } else {
+                        // Reemplazar completamente cada clave del archivo.
+                        for (const key in json) {
+                            if (!json.hasOwnProperty(key)) continue;
+                            localStorage.setItem(key, JSON.stringify(json[key]));
+                        }
+                    }
+                    showToast('Datos importados correctamente. Recargando...', 'success');
+                    // Recargar la página para refrescar la interfaz con los nuevos datos.
+                    setTimeout(() => location.reload(), 500);
+                } catch (ex) {
+                    console.error(ex);
+                    showToast('Error al importar el archivo JSON.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /**
+         * Ajusta las opciones disponibles del campo de unidad según la categoría
+         * seleccionada en el formulario de insumo. Cada categoría restringe
+         * las unidades a aquellas apropiadas (e.g. carnes en kg/g, líquidos en l/ml).
+         */
+        function updateUnidadOptions() {
+            const categoria = document.getElementById('insCategoria').value;
+            const sel = document.getElementById('insUnidad');
+            // Definir unidades permitidas por categoría
+            let unidades;
+            switch (categoria) {
+                case 'carne':
+                    unidades = ['kg','g'];
+                    break;
+                case 'liquido':
+                    unidades = ['l','ml'];
+                    break;
+                case 'panqueso':
+                    unidades = ['unidad','rebanada'];
+                    break;
+                case 'papas':
+                    unidades = ['kg','g','unidad'];
+                    break;
+                default:
+                    unidades = ['kg','g','l','ml','unidad','rebanada'];
+            }
+            // Reiniciar opciones
+            sel.innerHTML = '';
+            unidades.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.textContent = u;
+                sel.appendChild(opt);
+            });
+        }
+
+        /************************************************************************
+         *    Configuración General
+         ***********************************************************************/
+        function loadConfigUI() {
+            const cfg = getData(StorageKeys.config);
+            document.getElementById('businessName').textContent = cfg.nombreNegocio;
+            document.getElementById('cfgNombreNegocio').value = cfg.nombreNegocio;
+            document.getElementById('cfgMoneda').value = cfg.moneda;
+            document.getElementById('cfgSimbolo').value = cfg.simboloMoneda;
+            const gastosFijos = getData(StorageKeys.gastosFijos);
+            document.getElementById('gastoFijoAlquiler').value = gastosFijos.alquiler;
+            document.getElementById('gastoFijoLuz').value = gastosFijos.luz;
+            document.getElementById('gastoFijoGas').value = gastosFijos.gas;
+            document.getElementById('gastoFijoAgua').value = gastosFijos.agua;
+            document.getElementById('cfgImpuesto').value = getData(StorageKeys.impuesto);
+        }
+        function saveConfiguracion() {
+            const nombreNegocio = document.getElementById('cfgNombreNegocio').value.trim();
+            const moneda = document.getElementById('cfgMoneda').value.trim();
+            const simbolo = document.getElementById('cfgSimbolo').value.trim();
+            if (!nombreNegocio || !moneda || !simbolo) {
+                showToast('Completa todos los campos de configuración.', 'error');
+                return;
+            }
+            setData(StorageKeys.config, { nombreNegocio: nombreNegocio, moneda: moneda, simboloMoneda: simbolo });
+            document.getElementById('businessName').textContent = nombreNegocio;
+            showToast('Configuración guardada correctamente.', 'success');
+        }
+        function saveGastosFijos() {
+            const alquiler = parseFloat(document.getElementById('gastoFijoAlquiler').value) || 0;
+            const luz = parseFloat(document.getElementById('gastoFijoLuz').value) || 0;
+            const gas = parseFloat(document.getElementById('gastoFijoGas').value) || 0;
+            const agua = parseFloat(document.getElementById('gastoFijoAgua').value) || 0;
+            setData(StorageKeys.gastosFijos, { alquiler, luz, gas, agua });
+            showToast('Gastos fijos guardados correctamente.', 'success');
+        }
+        function saveImpuesto() {
+            const impuesto = parseFloat(document.getElementById('cfgImpuesto').value) || 0;
+            setData(StorageKeys.impuesto, impuesto);
+            showToast('Porcentaje de impuesto guardado.', 'success');
+        }
+
+        /************************************************************************
+         *    Inventario
+         ***********************************************************************/
+        function refreshInventarioList() {
+            const lista = document.getElementById('inventarioList');
+            lista.innerHTML = '';
+            const inventario = getData(StorageKeys.inventario);
+            inventario.forEach((insumo, idx) => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                const mermaFactor = (100 - (insumo.merma || 0)) / 100;
+                const costoBase = insumo.precioTotal / (insumo.contenido || 1);
+                const costoConImpuesto = costoBase * (1 + (insumo.impuesto || 0) / 100);
+                const costoUnitario = costoConImpuesto / mermaFactor;
+                const stockInfo = insumo.stock !== undefined ? `<br>Stock: ${insumo.stock} ${insumo.unidad}` : '';
+                const categoriaInfo = insumo.categoria ? `<br>Categoría: ${insumo.categoria}` : '';
+                // Ajustar la precisión de decimales: si el costo es muy pequeño, mostrar 4 decimales para evitar que aparezca 0.00
+                const decimals = costoUnitario < 0.01 ? 4 : 2;
+                div.innerHTML = `<strong>${insumo.nombre}</strong>${categoriaInfo}<br>Costo unitario real: ${costoUnitario.toFixed(decimals)} ${getData(StorageKeys.config).simboloMoneda} por ${insumo.unidad}${stockInfo}<br>` +
+                    `<button data-idx="${idx}" class="editInsumoBtn">Editar</button> ` +
+                    `<button data-idx="${idx}" class="deleteInsumoBtn">Eliminar</button>`;
+                lista.appendChild(div);
+            });
+            // Asignar eventos de editar/eliminar
+            lista.querySelectorAll('.editInsumoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    editInsumo(index);
+                });
+            });
+            lista.querySelectorAll('.deleteInsumoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    if (confirm('¿Eliminar este insumo?')) {
+                        const inv = getData(StorageKeys.inventario);
+                        inv.splice(index,1);
+                        setData(StorageKeys.inventario, inv);
+                        refreshInventarioList();
+                    }
+                });
+            });
+            // Mostrar mensaje si no hay insumos registrados
+            if (inventario.length === 0) {
+                showEmptyList(lista, 'No hay insumos registrados.');
+            }
+        }
+        function saveInsumo() {
+            const nombre = document.getElementById('insNombre').value.trim();
+            const categoria = document.getElementById('insCategoria').value;
+            const unidad = document.getElementById('insUnidad').value;
+            const contenido = parseFloat(document.getElementById('insContenido').value) || 0;
+            const precioTotal = parseFloat(document.getElementById('insPrecio').value) || 0;
+            const impuesto = parseFloat(document.getElementById('insImpuesto').value) || 0;
+            const merma = parseFloat(document.getElementById('insMerma').value) || 0;
+            const stock = parseFloat(document.getElementById('insStock').value);
+            if (!nombre || !unidad || !contenido || !precioTotal) {
+                showToast('Completa todos los campos obligatorios para el insumo.', 'error');
+                return;
+            }
+            const inventario = getData(StorageKeys.inventario);
+            const idx = document.getElementById('saveInsumoBtn').dataset.index;
+            const insumo = { nombre, categoria, unidad, contenido, precioTotal, impuesto, merma, stock: !isNaN(stock) ? stock : undefined, timestamp: timestamp() };
+            if (idx === '') {
+                inventario.push(insumo);
+            } else {
+                inventario[idx] = insumo;
+            }
+            setData(StorageKeys.inventario, inventario);
+            toggleModal('insumoModal');
+            refreshInventarioList();
+        }
+        function editInsumo(index) {
+            const insumo = getData(StorageKeys.inventario)[index];
+            document.getElementById('insNombre').value = insumo.nombre;
+            document.getElementById('insCategoria').value = insumo.categoria || 'otro';
+            updateUnidadOptions();
+            document.getElementById('insUnidad').value = insumo.unidad;
+            document.getElementById('insContenido').value = insumo.contenido;
+            document.getElementById('insPrecio').value = insumo.precioTotal;
+            document.getElementById('insImpuesto').value = insumo.impuesto;
+            document.getElementById('insMerma').value = insumo.merma;
+            document.getElementById('insStock').value = insumo.stock !== undefined ? insumo.stock : '';
+            document.getElementById('saveInsumoBtn').dataset.index = index;
+            toggleModal('insumoModal');
+        }
+
+        /************************************************************************
+         *    Productos (recetas)
+         ***********************************************************************/
+        function resetProductoModal() {
+            document.getElementById('prodNombre').value = '';
+            document.getElementById('prodPrecio').value = '';
+            document.getElementById('prodIngredientesContainer').innerHTML = '';
+            document.getElementById('saveProductoBtn').dataset.index = '';
+            // Poblar datalist de insumos antes de añadir campos
+            populateInsumosDatalist();
+            addIngredienteField();
+        }
+        function addIngredienteField() {
+            // Actualizar datalist de insumos por si se añadió un insumo mientras se editaba el producto
+            populateInsumosDatalist();
+            const container = document.getElementById('prodIngredientesContainer');
+            const div = document.createElement('div');
+            div.style.display = 'flex';
+            div.style.gap = '0.5rem';
+            div.style.marginBottom = '0.5rem';
+            // Crear input con datalist para buscar insumo
+            const nombreInput = document.createElement('input');
+            nombreInput.type = 'text';
+            nombreInput.setAttribute('list', 'insumosDatalist');
+            nombreInput.placeholder = 'Insumo';
+            nombreInput.className = 'ing-nombre';
+            // Cantidad
+            const qty = document.createElement('input');
+            qty.type = 'number';
+            qty.min = '0';
+            qty.step = '0.01';
+            qty.placeholder = 'Cantidad';
+            qty.className = 'ing-cantidad';
+            // Botón para eliminar ingrediente
+            const del = document.createElement('button');
+            del.textContent = '×';
+            del.style.background = '#f44336';
+            del.style.border = 'none';
+            del.style.color = '#fff';
+            del.style.borderRadius = '4px';
+            del.addEventListener('click', () => {
+                container.removeChild(div);
+            });
+            div.appendChild(nombreInput);
+            div.appendChild(qty);
+            div.appendChild(del);
+            container.appendChild(div);
+        }
+        function saveProducto() {
+            const nombre = document.getElementById('prodNombre').value.trim();
+            const precio = parseFloat(document.getElementById('prodPrecio').value) || 0;
+            if (!nombre || precio <= 0) {
+                showToast('Completa el nombre y precio de venta.', 'error');
+                return;
+            }
+            // Recopilar ingredientes con búsqueda de nombre
+            const ingredientesDivs = document.getElementById('prodIngredientesContainer').children;
+            const ingredientes = [];
+            const inventario = getData(StorageKeys.inventario);
+            for (let div of ingredientesDivs) {
+                const nombreInput = div.querySelector('.ing-nombre');
+                const qtyInput = div.querySelector('.ing-cantidad');
+                const nombreInsumo = nombreInput ? nombreInput.value.trim() : '';
+                const cant = parseFloat(qtyInput ? qtyInput.value : '') || 0;
+                if (!nombreInsumo || cant <= 0) {
+                    showToast('Selecciona un insumo y una cantidad válida para cada ingrediente.', 'error');
+                    return;
+                }
+                const idx = inventario.findIndex(ins => ins.nombre === nombreInsumo);
+                if (idx === -1) {
+                    showToast(`El insumo "${nombreInsumo}" no existe en el inventario.`, 'error');
+                    return;
+                }
+                const insumo = inventario[idx];
+                ingredientes.push({ insumoIndex: idx, cantidad: cant, insumoNombre: insumo.nombre });
+            }
+            if (ingredientes.length === 0) {
+                showToast('Añade al menos un ingrediente.', 'error');
+                return;
+            }
+            const productos = getData(StorageKeys.productos);
+            const idxEdit = document.getElementById('saveProductoBtn').dataset.index;
+            const producto = { nombre, precio, ingredientes, timestamp: timestamp() };
+            if (idxEdit === '') {
+                productos.push(producto);
+            } else {
+                productos[idxEdit] = producto;
+            }
+            // Guardar productos actualizados
+            setData(StorageKeys.productos, productos);
+            // Limpiar índice de edición para evitar reutilizarlo en nuevas creaciones
+            document.getElementById('saveProductoBtn').dataset.index = '';
+            // Cerrar modal y refrescar listas
+            toggleModal('productoModal');
+            refreshProductosList();
+            // Actualizar la lista de sugerencias de productos para ventas y gastos
+            populateProductosDatalist();
+        }
+        function refreshProductosList() {
+            const lista = document.getElementById('productosList');
+            lista.innerHTML = '';
+            const productos = getData(StorageKeys.productos);
+            const inv = getData(StorageKeys.inventario);
+            productos.forEach((prod, idx) => {
+                // Calcular COGS (costo de preparación)
+                let costo = 0;
+                prod.ingredientes.forEach(ing => {
+                    const ins = inv[ing.insumoIndex];
+                    const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                    const costoBase = ins.precioTotal / (ins.contenido || 1);
+                    const costoConImpuesto = costoBase * (1 + (ins.impuesto || 0) / 100);
+                    const unitario = costoConImpuesto / mermaFactor;
+                    costo += unitario * ing.cantidad;
+                });
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `<strong>${prod.nombre}</strong> - Precio: ${prod.precio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} <br>` +
+                    `Costo de preparación (COGS): ${costo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                    `<button data-idx="${idx}" class="editProductoBtn">Editar</button> ` +
+                    `<button data-idx="${idx}" class="deleteProductoBtn">Eliminar</button>`;
+                lista.appendChild(div);
+            });
+            lista.querySelectorAll('.editProductoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    editProducto(index);
+                });
+            });
+            lista.querySelectorAll('.deleteProductoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    if (confirm('¿Eliminar este producto?')) {
+                        const prods = getData(StorageKeys.productos);
+                        prods.splice(index,1);
+                        setData(StorageKeys.productos, prods);
+                        refreshProductosList();
+                    }
+                });
+            });
+            // Estado vacío para productos
+            if (productos.length === 0) {
+                showEmptyList(lista, 'No hay productos registrados.');
+            }
+            // Actualizar ingresos por producto
+            refreshIngresosPorProducto();
+            // Actualizar datalist de productos para búsqueda en venta y gastos
+            populateProductosDatalist();
+        }
+        function editProducto(index) {
+            const producto = getData(StorageKeys.productos)[index];
+            document.getElementById('prodNombre').value = producto.nombre;
+            document.getElementById('prodPrecio').value = producto.precio;
+            document.getElementById('prodIngredientesContainer').innerHTML = '';
+            // Asegurar que la datalist de insumos esté actualizada
+            populateInsumosDatalist();
+            producto.ingredientes.forEach(ing => {
+                addIngredienteField();
+                const container = document.getElementById('prodIngredientesContainer');
+                const lastDiv = container.lastChild;
+                // Establecer el nombre del insumo y cantidad
+                const nombreInput = lastDiv.querySelector('.ing-nombre');
+                const qtyInput = lastDiv.querySelector('.ing-cantidad');
+                if (nombreInput) nombreInput.value = ing.insumoNombre;
+                if (qtyInput) qtyInput.value = ing.cantidad;
+            });
+            document.getElementById('saveProductoBtn').dataset.index = index;
+            toggleModal('productoModal');
+        }
+        // Rellena la lista de productos para autocompletar en el modal de venta
+        function populateProductosDatalist() {
+            const datalist = document.getElementById('productosDatalist');
+            if (!datalist) return;
+            datalist.innerHTML = '';
+            const productos = getData(StorageKeys.productos) || [];
+            // Ordenar alfabéticamente (ignorando mayúsculas/minúsculas) para mejorar la búsqueda
+            productos.sort((a, b) => {
+                const aName = (a.nombre || '').toLowerCase();
+                const bName = (b.nombre || '').toLowerCase();
+                if (aName < bName) return -1;
+                if (aName > bName) return 1;
+                return 0;
+            });
+            // Obtener símbolo de moneda para mostrar en las sugerencias (si existe)
+            const cfg = getData(StorageKeys.config) || {};
+            const symbol = cfg.simboloMoneda || '';
+            productos.forEach(prod => {
+                const opt = document.createElement('option');
+                // El valor usado para autocompletado sigue siendo el nombre del producto
+                opt.value = prod.nombre;
+                // Si se configuró un símbolo de moneda, incluir el precio como etiqueta para mejor UX
+                // Algunos navegadores muestran el atributo label como texto adicional en las opciones
+                if (symbol) {
+                    opt.label = `${prod.nombre} - ${symbol}${prod.precio}`;
+                } else {
+                    opt.label = `${prod.nombre} - ${prod.precio}`;
+                }
+                datalist.appendChild(opt);
+            });
+        }
+
+        // Rellena la lista de insumos para autocompletar en el modal de producto y gastos
+        function populateInsumosDatalist() {
+            const dl = document.getElementById('insumosDatalist');
+            if (!dl) return;
+            dl.innerHTML = '';
+            const inventario = getData(StorageKeys.inventario) || [];
+            inventario.forEach(ins => {
+                const opt = document.createElement('option');
+                opt.value = ins.nombre;
+                dl.appendChild(opt);
+            });
+        }
+
+        /************************************************************************
+         *    Operaciones: Ventas y Gastos por fecha
+         ***********************************************************************/
+        function refreshOperacionesUI() {
+            const fechaInput = document.getElementById('operacionDate');
+            if (!fechaInput.value) {
+                // Si no hay fecha seleccionada, establecer hoy
+                const today = new Date();
+                const pad = (n) => n.toString().padStart(2, '0');
+                fechaInput.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+            }
+            const key = dateKey(fechaInput.value);
+            if (!key) return;
+            const transacciones = getData(StorageKeys.transacciones);
+            if (!transacciones[key]) {
+                transacciones[key] = { ventas: [], gastos: [], gastosOperativos: [] };
+                setData(StorageKeys.transacciones, transacciones);
+            }
+            // Mostrar ventas
+            const ventasDiv = document.getElementById('ventasList');
+            ventasDiv.innerHTML = '';
+            transacciones[key].ventas.forEach((venta, idx) => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `${venta.producto} x${venta.cantidad} - ${venta.precio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (COGS: ${venta.cogs.toFixed(2)})<br>` +
+                    `<small>Pago: ${venta.pago}, ${venta.tipoServicio}${venta.mesa ? ', Mesa ' + venta.mesa : ''}</small><br>` +
+                    `<button data-idx="${idx}" class="deleteVentaBtn">Eliminar</button>`;
+                ventasDiv.appendChild(div);
+            });
+            ventasDiv.querySelectorAll('.deleteVentaBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    if (confirm('¿Eliminar esta venta?')) {
+                        transacciones[key].ventas.splice(index, 1);
+                        setData(StorageKeys.transacciones, transacciones);
+                        refreshOperacionesUI();
+                    }
+                });
+            });
+            // Si no hay ventas, mostrar un estado vacío amigable
+            showEmptyList(ventasDiv, 'No hay ventas registradas para esta fecha.');
+            // Mostrar gastos variables
+            const gastosDiv = document.getElementById('gastosList');
+            gastosDiv.innerHTML = '';
+            transacciones[key].gastos.forEach((gasto, idx) => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.innerHTML = `${gasto.descripcion} - ${gasto.monto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (${gasto.categoria})<br>` +
+                    `<button data-idx="${idx}" class="deleteGastoBtn">Eliminar</button>`;
+                gastosDiv.appendChild(div);
+            });
+            gastosDiv.querySelectorAll('.deleteGastoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    if (confirm('¿Eliminar este gasto?')) {
+                        transacciones[key].gastos.splice(index, 1);
+                        setData(StorageKeys.transacciones, transacciones);
+                        refreshOperacionesUI();
+                    }
+                });
+            });
+            // Si no hay gastos, mostrar un estado vacío amigable
+            showEmptyList(gastosDiv, 'No hay gastos registrados para esta fecha.');
+            // Calcular gastos operativos prorrateados
+            const gastosFijos = getData(StorageKeys.gastosFijos);
+            const diasEnMes = new Date(new Date(fechaInput.value).getFullYear(), new Date(fechaInput.value).getMonth()+1, 0).getDate();
+            const prorrateo = (gastosFijos.alquiler + gastosFijos.luz + gastosFijos.gas + gastosFijos.agua) / diasEnMes;
+            transacciones[key].gastosOperativos = [{ monto: prorrateo, descripcion:'Gastos Fijos Prorrateados', hora: timestamp() }];
+            setData(StorageKeys.transacciones, transacciones);
+            document.getElementById('gastosOperativosProrrateados').textContent = `${prorrateo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} por día`;
+            // Actualiza análisis y KPIs después de modificar transacciones
+            refreshAnalisis();
+            updateKpis(key, transacciones[key]);
+            // Actualizar ingresos por producto al modificar ventas
+            refreshIngresosPorProducto();
+        }
+        function saveVenta() {
+            const fecha = document.getElementById('operacionDate').value;
+            const key = dateKey(fecha);
+            const productoNombre = document.getElementById('ventaProductoInput').value.trim();
+            const cantidad = parseInt(document.getElementById('ventaCantidad').value) || 1;
+            const precioUnitario = parseFloat(document.getElementById('ventaPrecio').value) || 0;
+            const tipoServicio = document.getElementById('ventaServicio').value;
+            const pago = document.getElementById('ventaPago').value;
+            const mesa = document.getElementById('ventaMesa').value.trim();
+            const cliente = {
+                nombre: document.getElementById('ventaClienteNombre').value.trim(),
+                telefono: document.getElementById('ventaClienteTelefono').value.trim(),
+                email: document.getElementById('ventaClienteEmail').value.trim()
+            };
+            if (!productoNombre || precioUnitario <= 0 || cantidad <= 0) {
+                showToast('Completa el producto, cantidad y precio de venta.', 'error');
+                return;
+            }
+            const precio = precioUnitario * cantidad;
+            const productos = getData(StorageKeys.productos);
+            // Buscar el producto para obtener COGS (insensible a mayúsculas/minúsculas)
+            let cogs = 0;
+            const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === productoNombre.toLowerCase());
+            if (prod) {
+                prod.ingredientes.forEach(ing => {
+                    const ins = getData(StorageKeys.inventario)[ing.insumoIndex];
+                    const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                    const costoBase = ins.precioTotal / (ins.contenido || 1);
+                    const costoConImpuesto = costoBase * (1 + (ins.impuesto || 0) / 100);
+                    const unitario = costoConImpuesto / mermaFactor;
+                    cogs += unitario * ing.cantidad;
+                });
+            }
+            const cogsTotal = cogs * cantidad;
+            // Actualizar inventario: restar insumos consumidos
+            if (prod) {
+                const inventario = getData(StorageKeys.inventario);
+                prod.ingredientes.forEach(ing => {
+                    const ins = inventario[ing.insumoIndex];
+                    if (ins && ins.stock !== undefined) {
+                        const consumo = ing.cantidad * cantidad;
+                        ins.stock = (ins.stock || 0) - consumo;
+                        if (ins.stock < 0) {
+                            showToast(`El insumo ${ins.nombre} se ha agotado (stock negativo). Considera comprar más.`, 'error');
+                            ins.stock = 0;
+                        }
+                    }
+                });
+                setData(StorageKeys.inventario, inventario);
+                // Refrescar lista de inventario si el usuario está en esa sección
+                refreshInventarioList();
+            }
+            // Preparar información logística si la venta es de tipo delivery
+            let logisticaInfo = null;
+            if (tipoServicio === 'delivery') {
+                const direccionEntrega = document.getElementById('ventaDireccion').value.trim();
+                const distEntrega = parseFloat(document.getElementById('ventaDistancia').value) || 0;
+                const tiempoEntrega = parseFloat(document.getElementById('ventaTiempo').value) || 0;
+                const costoEntrega = parseFloat(document.getElementById('ventaCosto').value) || 0;
+                const transpEntrega = document.getElementById('ventaTransporte').value;
+                logisticaInfo = {
+                    direccion: direccionEntrega,
+                    distancia: distEntrega,
+                    tiempo: tiempoEntrega,
+                    costo: costoEntrega,
+                    transporte: transpEntrega
+                };
+            }
+            const transacciones = getData(StorageKeys.transacciones);
+            transacciones[key].ventas.push({
+                producto: productoNombre,
+                cantidad,
+                precioUnitario,
+                precio,
+                tipoServicio,
+                pago,
+                mesa,
+                cogs: cogsTotal,
+                cliente,
+                hora: timestamp(),
+                logistica: logisticaInfo
+            });
+            setData(StorageKeys.transacciones, transacciones);
+            // Obtener la venta recién guardada para el recibo
+            const savedSale = transacciones[key].ventas[transacciones[key].ventas.length - 1];
+            // Actualizar clientes si se introdujo información
+            updateClientes(savedSale);
+            // Si la venta es delivery, registrar evento de logística
+            if (tipoServicio === 'delivery') {
+                // Obtener datos del formulario
+                const dist = parseFloat(document.getElementById('ventaDistancia').value) || 0;
+                const tpo = parseFloat(document.getElementById('ventaTiempo').value) || 0;
+                const costoLog = parseFloat(document.getElementById('ventaCosto').value) || 0;
+                const transporte = document.getElementById('ventaTransporte').value || 'mio';
+                const direccion = document.getElementById('ventaDireccion').value.trim();
+                if (costoLog > 0) {
+                    const logisticaEvents = getData(StorageKeys.logistica) || [];
+                    logisticaEvents.push({
+                        date: key,
+                        producto: productoNombre,
+                        distancia: dist,
+                        tiempo: tpo,
+                        transporte: transporte,
+                        costo: costoLog,
+                        ventaHora: savedSale.hora,
+                        direccion: direccion,
+                        timestamp: timestamp()
+                    });
+                    setData(StorageKeys.logistica, logisticaEvents);
+                    // Registrar gasto asociado en transacciones
+                    transacciones[key].gastos.push({
+                        descripcion: `Logística ${productoNombre}`,
+                        monto: costoLog,
+                        categoria: 'Logística',
+                        hora: timestamp()
+                    });
+                    setData(StorageKeys.transacciones, transacciones);
+                }
+            }
+            toggleModal('ventaModal');
+            refreshOperacionesUI();
+            // Refrescar logística y gastos si se registró delivery
+            if (tipoServicio === 'delivery') {
+                refreshLogistica();
+                refreshGastos();
+                refreshFinanzas();
+            }
+            generateReceipt(savedSale);
+            toggleModal('receiptModal');
+            refreshClientes();
+            // Notificar éxito al usuario
+            showToast('Venta registrada correctamente.', 'success');
+        }
+        function saveGasto() {
+            const fecha = document.getElementById('operacionDate').value;
+            const key = dateKey(fecha);
+            const descripcion = document.getElementById('gastoDesc').value.trim();
+            const montoInput = parseFloat(document.getElementById('gastoMonto').value) || 0;
+            const categoria = document.getElementById('gastoCategoria').value.trim();
+            const insumoIdx = document.getElementById('gastoInsumoSelect').value;
+            const insumoQty = parseFloat(document.getElementById('gastoInsumoCantidad').value) || 0;
+            const prodName = document.getElementById('gastoProductoInput').value.trim();
+            const prodQty = parseFloat(document.getElementById('gastoProductoCantidad').value) || 0;
+            const inventario = getData(StorageKeys.inventario) || [];
+            const productos = getData(StorageKeys.productos) || [];
+            let finalMonto = montoInput;
+            let finalDesc = descripcion;
+            let finalCategoria = categoria.trim();
+            // Si se seleccionó un producto por nombre, calcular su costo
+            if (prodName && prodQty > 0) {
+                // Buscar producto de forma insensible a mayúsculas/minúsculas
+                const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
+                if (prod) {
+                    finalMonto = prod.precio * prodQty;
+                    finalDesc = descripcion ? `${descripcion} (Consumo de ${prod.nombre})` : `Consumo de ${prod.nombre}`;
+                    finalCategoria = finalCategoria || 'Consumo Producto';
+                }
+            } else if (insumoIdx !== '' && !isNaN(insumoIdx) && insumoQty > 0) {
+                // Si no se seleccionó producto, pero sí insumo, calcular costo por insumo
+                const ins = inventario[insumoIdx];
+                if (ins) {
+                    // Calcular costo por unidad
+                    const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                    const base = ins.precioTotal / (ins.contenido || 1);
+                    const unitario = base * (1 + (ins.impuesto || 0) / 100) / mermaFactor;
+                    finalMonto = unitario * insumoQty;
+                    finalDesc = descripcion ? `${descripcion} (Consumo de ${ins.nombre})` : `Consumo de ${ins.nombre}`;
+                    finalCategoria = finalCategoria || 'Consumo Inventario';
+                    // Actualizar stock
+                    if (ins.stock !== undefined) {
+                        ins.stock = (ins.stock || 0) - insumoQty;
+                        if (ins.stock < 0) {
+                            showToast(`El insumo ${ins.nombre} se ha agotado (stock negativo). Considera comprar más.`, 'error');
+                            ins.stock = 0;
+                        }
+                        inventario[insumoIdx] = ins;
+                        setData(StorageKeys.inventario, inventario);
+                        refreshInventarioList();
+                    }
+                }
+            }
+            // Si no se especificó insumo ni producto, utilizar monto y descripción ingresados.
+            if (!finalDesc || finalMonto <= 0) {
+                showToast('Completa los campos del gasto o selecciona un insumo/producto válido.', 'error');
+                return;
+            }
+            const transacciones = getData(StorageKeys.transacciones);
+            transacciones[key].gastos.push({
+                descripcion: finalDesc,
+                monto: finalMonto,
+                categoria: finalCategoria || (insumoIdx !== '' ? 'Consumo Inventario' : (prodName ? 'Consumo Producto' : 'Sin Categoría')),
+                hora: timestamp()
+            });
+            setData(StorageKeys.transacciones, transacciones);
+            toggleModal('gastoModal');
+            refreshOperacionesUI();
+            refreshGastos();
+            refreshFinanzas();
+            refreshAnalisis();
+            // Notificar éxito
+            showToast('Gasto registrado correctamente.', 'success');
+        }
+
+        /************************************************************************
+         *    Análisis financiero
+         ***********************************************************************/
+        function refreshAnalisis() {
+            const transacciones = getData(StorageKeys.transacciones);
+            const impuestoPorc = getData(StorageKeys.impuesto);
+            const cfg = getData(StorageKeys.config);
+
+            // Calcular costo total de nómina actual
+            const empleados = getData(StorageKeys.empleados) || [];
+            let nominaTotal = 0;
+            empleados.forEach(emp => {
+                nominaTotal += (emp.salarioHora || 0) * (emp.horas || 0);
+            });
+            const fechas = Object.keys(transacciones);
+            // Variables acumuladoras por periodo
+            let totalDia = { ingresos:0, cogs:0, gastos:0, gastosFijos:0 };
+            let totalSemana = { ingresos:0, cogs:0, gastos:0, gastosFijos:0, dias:0 };
+            let totalMes = { ingresos:0, cogs:0, gastos:0, gastosFijos:0, dias:0 };
+            let totalAnio = { ingresos:0, cogs:0, gastos:0, gastosFijos:0, dias:0 };
+            const hoy = new Date(document.getElementById('operacionDate').value || new Date());
+            fechas.forEach(dateKeyStr => {
+                const trans = transacciones[dateKeyStr];
+                const dateObj = new Date(dateKeyStr);
+                const ingresos = trans.ventas.reduce((sum, v) => sum + v.precio, 0);
+                const cogs = trans.ventas.reduce((sum, v) => sum + v.cogs, 0);
+                const gastos = trans.gastos.reduce((sum, g) => sum + g.monto, 0);
+                const gastosFijos = trans.gastosOperativos.reduce((sum,g) => sum + g.monto, 0);
+                // Acumular según periodo
+                if (dateKeyStr === dateKey(hoy.toISOString())) {
+                    totalDia.ingresos += ingresos;
+                    totalDia.cogs += cogs;
+                    totalDia.gastos += gastos;
+                    totalDia.gastosFijos += gastosFijos;
+                }
+                // Semana (últimos 7 días)
+                const diffDias = Math.floor((hoy - dateObj) / (1000*3600*24));
+                if (diffDias < 7) {
+                    totalSemana.ingresos += ingresos;
+                    totalSemana.cogs += cogs;
+                    totalSemana.gastos += gastos;
+                    totalSemana.gastosFijos += gastosFijos;
+                    totalSemana.dias++;
+                }
+                // Mes (mismo mes y año)
+                if (dateObj.getMonth() === hoy.getMonth() && dateObj.getFullYear() === hoy.getFullYear()) {
+                    totalMes.ingresos += ingresos;
+                    totalMes.cogs += cogs;
+                    totalMes.gastos += gastos;
+                    totalMes.gastosFijos += gastosFijos;
+                    totalMes.dias++;
+                }
+                // Año (mismo año)
+                if (dateObj.getFullYear() === hoy.getFullYear()) {
+                    totalAnio.ingresos += ingresos;
+                    totalAnio.cogs += cogs;
+                    totalAnio.gastos += gastos;
+                    totalAnio.gastosFijos += gastosFijos;
+                    totalAnio.dias++;
+                }
+            });
+            // Calcular utilidades y márgenes
+            function getSummary(obj) {
+                const impuestos = obj.ingresos * impuestoPorc / 100;
+                const totalGastos = obj.gastos + obj.gastosFijos + nominaTotal;
+                const ganancia = obj.ingresos - obj.cogs - totalGastos - impuestos;
+                const margen = obj.ingresos ? (ganancia/obj.ingresos)*100 : 0;
+                return { ingresos: obj.ingresos, cogs: obj.cogs, gastos: totalGastos, impuestos, ganancia, margen };
+            }
+            const sumaDia = getSummary(totalDia);
+            const sumaSemana = getSummary(totalSemana);
+            const sumaMes = getSummary(totalMes);
+            const sumaAnio = getSummary(totalAnio);
+            // Actualizar HTML
+            document.getElementById('resumenDia').innerHTML = `<strong>Día:</strong> Ingresos ${sumaDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}, COGS ${sumaDia.cogs.toFixed(2)}, Gastos ${sumaDia.gastos.toFixed(2)}, Impuestos ${sumaDia.impuestos.toFixed(2)}, Ganancia ${sumaDia.ganancia.toFixed(2)} (${sumaDia.margen.toFixed(2)}%)`;
+            document.getElementById('resumenSemana').innerHTML = `<strong>Semana:</strong> Ingresos ${sumaSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaSemana.ganancia.toFixed(2)} (${sumaSemana.margen.toFixed(2)}%)`;
+            document.getElementById('resumenMes').innerHTML = `<strong>Mes:</strong> Ingresos ${sumaMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaMes.ganancia.toFixed(2)} (${sumaMes.margen.toFixed(2)}%)`;
+            document.getElementById('resumenAnio').innerHTML = `<strong>Año:</strong> Ingresos ${sumaAnio.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaAnio.ganancia.toFixed(2)} (${sumaAnio.margen.toFixed(2)}%)`;
+            // Auditoría
+            const detalles = [];
+            detalles.push(`Ganancia Neta Día = Ingresos (${sumaDia.ingresos.toFixed(2)}) - COGS (${sumaDia.cogs.toFixed(2)}) - Gastos (${(totalDia.gastos+totalDia.gastosFijos).toFixed(2)}) - Nómina (${nominaTotal.toFixed(2)}) - Impuestos (${sumaDia.impuestos.toFixed(2)}) = ${sumaDia.ganancia.toFixed(2)}`);
+            detalles.push(`Gastos Fijos Prorrateados: ${(totalDia.gastosFijos).toFixed(2)}`);
+            detalles.push(`Costo total de nómina: ${nominaTotal.toFixed(2)} ${cfg.simboloMoneda}`);
+            document.getElementById('auditoriaDetalles').textContent = detalles.join('\n');
+            // Rentabilidad por producto
+            renderRentabilidadTabla();
+            // Valoración del negocio
+            renderValoracion(sumaMes);
+        }
+        function renderRentabilidadTabla() {
+            const tbody = document.getElementById('tablaRentabilidad');
+            tbody.innerHTML = '';
+            const prods = getData(StorageKeys.productos);
+            const inv = getData(StorageKeys.inventario);
+            prods.forEach(prod => {
+                let cogs = 0;
+                prod.ingredientes.forEach(ing => {
+                    const ins = inv[ing.insumoIndex];
+                    const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                    const base = ins.precioTotal / (ins.contenido || 1);
+                    const imp = base * (1 + (ins.impuesto || 0) / 100);
+                    const unitario = imp / mermaFactor;
+                    cogs += unitario * ing.cantidad;
+                });
+                const gananciaBruta = prod.precio - cogs;
+                const margen = prod.precio ? (gananciaBruta / prod.precio) * 100 : 0;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${prod.nombre}</td><td>${prod.precio.toFixed(2)}</td><td>${cogs.toFixed(2)}</td><td>${gananciaBruta.toFixed(2)}</td><td>${margen.toFixed(2)}%</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderValoracion(summaryMes) {
+            // Valoración simplificada: múltiplo entre 12 y 24 meses
+            const gananciaMensual = summaryMes.ganancia;
+            const minVal = gananciaMensual * 12;
+            const maxVal = gananciaMensual * 24;
+            const cfg = getData(StorageKeys.config);
+            let estado = '';
+            if (gananciaMensual > 0) estado = 'El negocio está generando ganancias.';
+            else if (gananciaMensual === 0) estado = 'El negocio está en equilibrio.';
+            else estado = 'El negocio está generando pérdidas. Requiere reestructuración.';
+            document.getElementById('valoracionNegocio').textContent = `Valoración estimada: entre ${minVal.toFixed(2)} y ${maxVal.toFixed(2)} ${cfg.simboloMoneda}. ${estado}`;
+        }
+
+        /************************************************************************
+         *    Ingresos por Producto
+         *
+         * Calcula los ingresos brutos y netos generados por cada producto a partir
+         * de las ventas registradas. Los ingresos brutos son la suma del
+         * precio de venta, mientras que los ingresos netos restan el
+         * porcentaje de impuesto configurado. La información se muestra en la
+         * sección de Productos para ofrecer una visión más profunda del
+         * desempeño de cada producto.
+         ************************************************************************/
+        function refreshIngresosPorProducto() {
+            const container = document.getElementById('ingresosPorProductoList');
+            if (!container) return;
+            container.innerHTML = '';
+            const transacciones = getData(StorageKeys.transacciones);
+            const productos = getData(StorageKeys.productos) || [];
+            const impuestoPorc = getData(StorageKeys.impuesto);
+            const resumen = {};
+            // Inicializar resumen con nombres de productos
+            productos.forEach(prod => {
+                resumen[prod.nombre] = { bruto: 0, neto: 0 };
+            });
+            Object.keys(transacciones).forEach(dateKeyStr => {
+                const t = transacciones[dateKeyStr];
+                t.ventas.forEach(v => {
+                    if (resumen[v.producto]) {
+                        resumen[v.producto].bruto += v.precio;
+                        resumen[v.producto].neto += v.precio * (1 - impuestoPorc / 100);
+                    }
+                });
+            });
+            // Construir HTML
+            const cfg = getData(StorageKeys.config);
+            let anyData = false;
+            Object.keys(resumen).forEach(prodNombre => {
+                const data = resumen[prodNombre];
+                // Mostrar solo productos con ingresos
+                if (data.bruto > 0) {
+                    anyData = true;
+                    const div = document.createElement('div');
+                    div.className = 'card';
+                    div.innerHTML = `<strong>${prodNombre}</strong><br>` +
+                        `Ingresos brutos: ${data.bruto.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                        `Ingresos netos (sin impuestos): ${data.neto.toFixed(2)} ${cfg.simboloMoneda}`;
+                    container.appendChild(div);
+                }
+            });
+            if (!anyData) {
+                showEmptyList(container, 'No hay ingresos registrados para los productos.');
+            }
+        }
+
+        /************************************************************************
+         *    Finanzas: saldos y flujos de efectivo
+         ************************************************************************/
+        function refreshFinanzas() {
+            const transacciones = getData(StorageKeys.transacciones);
+            const cfg = getData(StorageKeys.config);
+            const fechas = Object.keys(transacciones);
+            const hoy = new Date(document.getElementById('operacionDate').value || new Date());
+            // Saldos acumulados
+            let cashBalance = 0;
+            let bankBalance = 0;
+            // Totales por periodo
+            let totalDia = { ingresos:0, gastos:0 };
+            let totalSemana = { ingresos:0, gastos:0 };
+            let totalMes = { ingresos:0, gastos:0 };
+            // Acumuladores para métricas adicionales
+            let totalGastoHistorico = 0;
+            let totalIngresoHoy = 0;
+            // Historial detallado HTML
+            let hist = '';
+            fechas.forEach(dateKeyStr => {
+                const trans = transacciones[dateKeyStr];
+                const dateObj = new Date(dateKeyStr);
+                let ingresosDia = 0;
+                let gastosDia = 0;
+                let cashIn = 0;
+                let bankIn = 0;
+                let cashOut = 0;
+                // Ventas
+                trans.ventas.forEach(v => {
+                    const ingreso = v.precio;
+                    ingresosDia += ingreso;
+                    if (v.pago === 'efectivo') {
+                        cashIn += ingreso;
+                    } else {
+                        bankIn += ingreso;
+                    }
+                });
+                // Gastos variables
+                trans.gastos.forEach(g => {
+                    gastosDia += g.monto;
+                    cashOut += g.monto;
+                });
+                // Gastos operativos prorrateados
+                trans.gastosOperativos.forEach(go => {
+                    gastosDia += go.monto;
+                    cashOut += go.monto;
+                });
+                // Actualizar saldos
+                cashBalance += cashIn - cashOut;
+                bankBalance += bankIn;
+                // Diferencia de días entre hoy y la fecha en cuestión
+                const diffDias = Math.floor((hoy - dateObj) / (1000*3600*24));
+                // Acumular por periodo
+                if (diffDias === 0) {
+                    totalDia.ingresos += ingresosDia;
+                    totalDia.gastos += gastosDia;
+                    totalIngresoHoy += ingresosDia;
+                } else if (diffDias > 0) {
+                    totalGastoHistorico += gastosDia;
+                }
+                if (diffDias < 7) {
+                    totalSemana.ingresos += ingresosDia;
+                    totalSemana.gastos += gastosDia;
+                }
+                if (dateObj.getMonth() === hoy.getMonth() && dateObj.getFullYear() === hoy.getFullYear()) {
+                    totalMes.ingresos += ingresosDia;
+                    totalMes.gastos += gastosDia;
+                }
+                // Historial detallado: listar ventas y gastos con hora
+                hist += `<div class="card"><strong>${dateKeyStr}</strong><br>`;
+                if (trans.ventas.length) {
+                    hist += '<em>Ventas:</em><br>';
+                    trans.ventas.forEach(v => {
+                        hist += `${v.hora}: ${v.producto} - ${v.precio.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                    });
+                }
+                if (trans.gastos.length || trans.gastosOperativos.length) {
+                    hist += '<em>Gastos:</em><br>';
+                    trans.gastos.forEach(g => {
+                        hist += `${g.hora}: ${g.descripcion} - ${g.monto.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                    });
+                    trans.gastosOperativos.forEach(go => {
+                        hist += `${go.descripcion}: ${go.monto.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                    });
+                }
+                hist += '</div>';
+            });
+            // Incluir costo de nómina en los gastos de los periodos
+            const empleados = getData(StorageKeys.empleados) || [];
+            let nominaTotal = 0;
+            empleados.forEach(emp => {
+                nominaTotal += (emp.salarioHora || 0) * (emp.horas || 0);
+            });
+            totalDia.gastos += nominaTotal;
+            totalSemana.gastos += nominaTotal;
+            totalMes.gastos += nominaTotal;
+            // Calcular métricas adicionales
+            const balanceActual = cashBalance + bankBalance;
+            // Mostrar saldos detallados
+            document.getElementById('finanzasSaldo').innerHTML = `Efectivo: ${cashBalance.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                `Banco: ${bankBalance.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                `Ganado hoy: ${totalIngresoHoy.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                `Gastado histórico: ${totalGastoHistorico.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                `Balance actual: ${balanceActual.toFixed(2)} ${cfg.simboloMoneda}`;
+            // Resúmenes por periodo
+            // Calcular impuestos para ingresos de cada periodo y mostrar ingresos netos (ingresos - impuestos)
+            const impuestoPorc = getData(StorageKeys.impuesto);
+            const impuestosDia = totalDia.ingresos * impuestoPorc / 100;
+            const impuestosSemana = totalSemana.ingresos * impuestoPorc / 100;
+            const impuestosMes = totalMes.ingresos * impuestoPorc / 100;
+            const ingresosNetosDia = totalDia.ingresos - impuestosDia;
+            const ingresosNetosSemana = totalSemana.ingresos - impuestosSemana;
+            const ingresosNetosMes = totalMes.ingresos - impuestosMes;
+            document.getElementById('finanzasResumenDia').innerHTML = `<strong>Hoy:</strong> Ingresos brutos ${totalDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosDia.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalDia.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosDia - totalDia.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
+            document.getElementById('finanzasResumenSemana').innerHTML = `<strong>Semana:</strong> Ingresos brutos ${totalSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosSemana.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalSemana.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosSemana - totalSemana.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
+            document.getElementById('finanzasResumenMes').innerHTML = `<strong>Mes:</strong> Ingresos brutos ${totalMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosMes.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalMes.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosMes - totalMes.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
+            document.getElementById('finanzasHistorial').innerHTML = hist;
+        }
+
+        /************************************************************************
+         *    Recibo de venta
+         ************************************************************************/
+        function generateReceipt(venta) {
+            const cfg = getData(StorageKeys.config);
+            // Estimación de costos: ingredientes (COGS), operación (10%) y servicio (5%)
+            const cogs = venta.cogs;
+            const costoOperacion = cogs * 0.10;
+            const costoServicio = venta.precio * 0.05;
+            let html = '';
+            html += `<p><strong>Producto:</strong> ${venta.producto} x${venta.cantidad}</p>`;
+            html += `<p><strong>Precio de Venta:</strong> ${venta.precio.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            // Desglose por ingrediente (proporciones sobre el costo de ingredientes)
+            const productos = getData(StorageKeys.productos);
+            const inventario = getData(StorageKeys.inventario);
+            const producto = productos.find(p => p.nombre === venta.producto);
+            let detalleLista = '';
+            if (producto) {
+                // Calcular costo real por ingrediente para la venta
+                let totalInsumoCost = 0;
+                const costos = [];
+                producto.ingredientes.forEach(ing => {
+                    const ins = inventario[ing.insumoIndex];
+                    if (ins) {
+                        const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                        const base = ins.precioTotal / (ins.contenido || 1);
+                        const imp = base * (1 + (ins.impuesto || 0) / 100);
+                        const unitario = imp / mermaFactor;
+                        const costoInsumo = unitario * ing.cantidad * venta.cantidad;
+                        totalInsumoCost += costoInsumo;
+                        costos.push({ nombre: ins.nombre, costo: costoInsumo });
+                    }
+                });
+                // Generar lista con proporciones y montos estimados (sin revelar el costo real)
+                if (totalInsumoCost > 0) {
+                    detalleLista += '<ul>';
+                    costos.forEach(item => {
+                        const proporcion = item.costo / totalInsumoCost;
+                        // Asignar proporción al total de ingredientes y preparación (cogs+costoOperacion)
+                        const valorEstimado = (cogs + costoOperacion) * proporcion;
+                        detalleLista += `<li>${item.nombre}: ${(valorEstimado).toFixed(2)} ${cfg.simboloMoneda}</li>`;
+                    });
+                    detalleLista += '</ul>';
+                }
+            }
+            html += `<p><strong>Ingredientes y preparación:</strong> ${(cogs + costoOperacion).toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            if (detalleLista) {
+                html += `<p><em>Desglose estimado de ingredientes:</em>${detalleLista}</p>`;
+            }
+            html += `<p><strong>Servicio y gestión:</strong> ${costoServicio.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            // Mostrar costo logístico si existe y es mayor a cero
+            if (venta.logistica && venta.logistica.costo && venta.logistica.costo > 0) {
+                html += `<p><strong>Costo logística:</strong> ${venta.logistica.costo.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            }
+            html += `<p><strong>Total a pagar:</strong> ${venta.precio.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            // Mostrar detalles de entrega si están disponibles
+            if (venta.logistica && (venta.logistica.direccion || venta.logistica.distancia || venta.logistica.tiempo)) {
+                let detallesEntrega = '';
+                if (venta.logistica.direccion) detallesEntrega += `Dirección: ${venta.logistica.direccion}`;
+                if (venta.logistica.distancia) detallesEntrega += `${detallesEntrega ? ' - ' : ''}${venta.logistica.distancia} km`;
+                if (venta.logistica.tiempo) detallesEntrega += `${detallesEntrega ? ' - ' : ''}${venta.logistica.tiempo} min`;
+                html += `<p><em>Entrega:</em> ${detallesEntrega}</p>`;
+            }
+            if (venta.cliente && (venta.cliente.nombre || venta.cliente.telefono || venta.cliente.email)) {
+                html += `<p><strong>Cliente:</strong> ${venta.cliente.nombre || ''} ${venta.cliente.telefono ? ' - ' + venta.cliente.telefono : ''} ${venta.cliente.email ? ' - ' + venta.cliente.email : ''}</p>`;
+            }
+            document.getElementById('receiptContent').innerHTML = html;
+        }
+
+        /************************************************************************
+         *    Historial y Mis Datos
+         ***********************************************************************/
+        function populateHistorial() {
+            const content = document.getElementById('historialContent');
+            content.innerHTML = '';
+            const trans = getData(StorageKeys.transacciones);
+            const fechas = Object.keys(trans).sort();
+            fechas.forEach(dateKeyStr => {
+                const section = document.createElement('div');
+                section.className = 'card';
+                const transDia = trans[dateKeyStr];
+                let html = `<strong>${dateKeyStr}</strong><br>`;
+                if (transDia.ventas.length) {
+                    html += '<em>Ventas:</em><br>';
+                    transDia.ventas.forEach(v => {
+                        html += `- ${v.hora}: ${v.producto} por ${v.precio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (COGS ${v.cogs.toFixed(2)})<br>`;
+                    });
+                }
+                if (transDia.gastos.length) {
+                    html += '<em>Gastos:</em><br>';
+                    transDia.gastos.forEach(g => {
+                        html += `- ${g.hora}: ${g.descripcion} ${g.monto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (${g.categoria})<br>`;
+                    });
+                }
+                if (transDia.gastosOperativos.length) {
+                    html += '<em>Gastos Operativos:</em><br>';
+                    transDia.gastosOperativos.forEach(go => {
+                        html += `- ${go.descripcion}: ${go.monto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>`;
+                    });
+                }
+                section.innerHTML = html;
+                content.appendChild(section);
+            });
+        }
+        function populateMisDatos() {
+            const content = document.getElementById('misDatosContent');
+            const cfg = getData(StorageKeys.config);
+            const inventario = getData(StorageKeys.inventario);
+            const productos = getData(StorageKeys.productos);
+            const trans = getData(StorageKeys.transacciones);
+            const fechas = Object.keys(trans);
+            const primeraFecha = fechas.length ? fechas[0] : 'N/A';
+            const ultimaFecha = fechas.length ? fechas[fechas.length-1] : 'N/A';
+            const empleados = getData(StorageKeys.empleados) || [];
+            // Estimar tamaño del localStorage (en KB)
+            let sizeBytes = 0;
+            Object.keys(localStorage).forEach(k => {
+                const value = localStorage.getItem(k);
+                sizeBytes += k.length + value.length;
+            });
+            const sizeKB = (sizeBytes/1024).toFixed(2);
+            // Incluir información del dispositivo y tamaño de pantalla
+            content.innerHTML = `
+                <p><strong>Nombre del Negocio:</strong> ${cfg.nombreNegocio}</p>
+                <p><strong>Moneda:</strong> ${cfg.moneda} (${cfg.simboloMoneda})</p>
+                <p><strong>Total de Insumos:</strong> ${inventario.length}</p>
+                <p><strong>Total de Productos:</strong> ${productos.length}</p>
+                <p><strong>Total de Empleados:</strong> ${empleados.length}</p>
+                <p><strong>Fecha de Primera Transacción:</strong> ${primeraFecha}</p>
+                <p><strong>Fecha de Última Transacción:</strong> ${ultimaFecha}</p>
+                <p><strong>Tamaño Estimado de los Datos:</strong> ${sizeKB} KB</p>
+                <p><strong>Dispositivo detectado:</strong> ${detectedDevice}</p>
+                <p><strong>Resolución pantalla:</strong> ${window.innerWidth} × ${window.innerHeight}px</p>
+            `;
+        }
+
+        /************************************************************************
+         *    Sección de Gastos Avanzados
+         *
+         * Muestra un resumen de gastos por categoría y una lista completa
+         * de todas las entradas de gastos registradas (incluyendo gastos
+         * variables, gastos fijos prorrateados y logística). Permite abrir
+         * el modal de gasto para registrar nuevos gastos.
+         ***********************************************************************/
+        function refreshGastos() {
+            const trans = getData(StorageKeys.transacciones);
+            const cfg = getData(StorageKeys.config);
+            const resumen = {};
+            let listaHtml = '';
+            Object.keys(trans).forEach(dateKeyStr => {
+                const t = trans[dateKeyStr];
+                // Combinar gastos variables y operativos
+                const todosGastos = [];
+                t.gastos.forEach(g => todosGastos.push({ fecha: dateKeyStr, tipo: 'Variable', descripcion: g.descripcion, monto: g.monto, categoria: g.categoria || 'Sin Categoría', hora: g.hora }));
+                t.gastosOperativos.forEach(go => todosGastos.push({ fecha: dateKeyStr, tipo: 'Operativo', descripcion: go.descripcion, monto: go.monto, categoria: 'Gastos Fijos', hora: go.hora || timestamp() }));
+                todosGastos.forEach(item => {
+                    resumen[item.categoria] = (resumen[item.categoria] || 0) + item.monto;
+                    listaHtml += `<div class="card"><strong>${item.fecha}</strong><br>${item.descripcion} - ${item.monto.toFixed(2)} ${cfg.simboloMoneda}<br><small>Categoría: ${item.categoria}, Tipo: ${item.tipo}</small></div>`;
+                });
+            });
+            // Construir resumen HTML
+            let resumenHtml = '';
+            Object.keys(resumen).forEach(cat => {
+                resumenHtml += `<p><strong>${cat}:</strong> ${resumen[cat].toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            });
+            // Incluir nómina en el resumen de gastos
+            const empleados = getData(StorageKeys.empleados) || [];
+            let totalNomina = 0;
+            empleados.forEach(emp => {
+                totalNomina += (emp.salarioHora || 0) * (emp.horas || 0);
+            });
+            if (totalNomina > 0) {
+                resumenHtml += `<p><strong>Nómina:</strong> ${totalNomina.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+            }
+            document.getElementById('gastosResumenCategorias').innerHTML = resumenHtml || '<p>No hay gastos registrados.</p>';
+            document.getElementById('gastosListaCompleta').innerHTML = listaHtml || '<p>No hay gastos registrados.</p>';
+        }
+
+        /************************************************************************
+         *    Sección de Logística
+         *
+         * Permite registrar eventos logísticos asociados a ventas. Cada
+         * evento guarda distancia, tiempo, quién realiza el transporte y el
+         * costo. La función de guardado también registra automáticamente un
+         * gasto en la transacción diaria para que el costo logístico se
+         * refleje en los análisis financieros. La sección muestra un
+         * resumen (número de entregas, costo total y promedio) y una
+         * lista de eventos detallados.
+         ***********************************************************************/
+        function populateVentasLogistica(fechaStr) {
+            const select = document.getElementById('logisticaVenta');
+            select.innerHTML = '';
+            const key = dateKey(fechaStr);
+            if (!key) return;
+            const trans = getData(StorageKeys.transacciones);
+            if (!trans[key] || !trans[key].ventas.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No hay ventas';
+                select.appendChild(opt);
+                return;
+            }
+            trans[key].ventas.forEach((venta, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = `${venta.producto} - ${venta.hora}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function saveLogistica() {
+            const fechaStr = document.getElementById('logisticaFecha').value;
+            const key = dateKey(fechaStr);
+            const ventaIndex = document.getElementById('logisticaVenta').value;
+            const distancia = parseFloat(document.getElementById('logisticaDistancia').value) || 0;
+            const tiempo = parseFloat(document.getElementById('logisticaTiempo').value) || 0;
+            const transporte = document.getElementById('logisticaTransporte').value;
+            const costo = parseFloat(document.getElementById('logisticaCosto').value) || 0;
+            if (!key || ventaIndex === '' || isNaN(distancia) || isNaN(tiempo) || isNaN(costo) || costo <= 0) {
+                showToast('Completa todos los campos de logística y selecciona una venta.', 'error');
+                return;
+            }
+            const trans = getData(StorageKeys.transacciones);
+            const ventas = trans[key].ventas;
+            if (!ventas[ventaIndex]) {
+                showToast('Venta seleccionada no encontrada.', 'error');
+                return;
+            }
+            const venta = ventas[ventaIndex];
+            // Guardar evento logístico
+            const logisticaEvents = getData(StorageKeys.logistica) || [];
+            logisticaEvents.push({
+                date: key,
+                producto: venta.producto,
+                distancia,
+                tiempo,
+                transporte,
+                costo,
+                ventaHora: venta.hora,
+                timestamp: timestamp()
+            });
+            setData(StorageKeys.logistica, logisticaEvents);
+            // Registrar gasto asociado en la transacción diaria
+            trans[key].gastos.push({
+                descripcion: `Logística ${venta.producto}`,
+                monto: costo,
+                categoria: 'Logística',
+                hora: timestamp()
+            });
+            setData(StorageKeys.transacciones, trans);
+            toggleModal('logisticaModal');
+            refreshLogistica();
+            refreshOperacionesUI();
+            showToast('Evento logístico registrado correctamente.', 'success');
+        }
+
+        function refreshLogistica() {
+            const cfg = getData(StorageKeys.config);
+            const events = getData(StorageKeys.logistica) || [];
+            if (!events.length) {
+                document.getElementById('logisticaResumen').textContent = 'No hay entregas registradas.';
+                document.getElementById('logisticaList').innerHTML = '';
+                return;
+            }
+            // Calcular totales
+            let totalCost = 0;
+            const listHtml = [];
+            events.forEach((e) => {
+                totalCost += e.costo;
+                // Obtener la venta asociada para calcular rentabilidad
+                const trans = getData(StorageKeys.transacciones);
+                const ventasDelDia = trans[e.date] ? trans[e.date].ventas : [];
+                let utilidadNeta = null;
+                if (ventasDelDia.length) {
+                    const sale = ventasDelDia.find(v => v.producto === e.producto && v.hora === e.ventaHora);
+                    if (sale) {
+                        const ingresos = sale.precio;
+                        const costoProducto = sale.cogs;
+                        utilidadNeta = ingresos - costoProducto - e.costo;
+                    }
+                }
+                const utilidadInfo = utilidadNeta !== null ? `<br><em>Utilidad neta después de logística:</em> ${utilidadNeta.toFixed(2)} ${cfg.simboloMoneda}` : '';
+                const direccionInfo = e.direccion ? `<br>Dirección: ${e.direccion}` : '';
+                const tiempoInfo = e.tiempo ? `${e.tiempo} min` : 'N/A';
+                listHtml.push(`<div class="card"><strong>${e.date}</strong><br>${e.producto} (${e.ventaHora})<br>Distancia: ${e.distancia} km, Tiempo: ${tiempoInfo}<br>Transporte: ${e.transporte}, Costo: ${e.costo.toFixed(2)} ${cfg.simboloMoneda}${direccionInfo}${utilidadInfo}</div>`);
+            });
+            const avgCost = totalCost / events.length;
+            document.getElementById('logisticaResumen').innerHTML = `Total entregas: ${events.length}<br>Total costo: ${totalCost.toFixed(2)} ${cfg.simboloMoneda}<br>Costo promedio por entrega: ${avgCost.toFixed(2)} ${cfg.simboloMoneda}`;
+            document.getElementById('logisticaList').innerHTML = listHtml.join('');
+        }
+
+        /************************************************************************
+         *    Compras de Insumos
+         *
+         * Este módulo permite registrar compras adicionales de insumos existentes.
+         * Se incrementa el stock y se recalcula el costo promedio ponderado. La
+         * compra se registra como un gasto en la transacción diaria con la
+         * categoría "Compra Inventario" para efectos de análisis financiero.
+         ************************************************************************/
+        function populateCompraInsumos() {
+            const select = document.getElementById('compraInsumo');
+            select.innerHTML = '';
+            const inventario = getData(StorageKeys.inventario);
+            if (!inventario || inventario.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No hay insumos';
+                select.appendChild(opt);
+                return;
+            }
+            inventario.forEach((ins, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = ins.nombre;
+                select.appendChild(opt);
+            });
+        }
+
+        function saveCompra() {
+            const insumoIndex = parseInt(document.getElementById('compraInsumo').value);
+            const cantidad = parseFloat(document.getElementById('compraCantidad').value) || 0;
+            const precioTotal = parseFloat(document.getElementById('compraCosto').value) || 0;
+            const impuesto = parseFloat(document.getElementById('compraImpuesto').value) || 0;
+            if (isNaN(insumoIndex) || cantidad <= 0 || precioTotal <= 0) {
+                showToast('Completa todos los campos de compra de forma válida.', 'error');
+                return;
+            }
+            const inventario = getData(StorageKeys.inventario);
+            const insumo = inventario[insumoIndex];
+            if (!insumo) {
+                showToast('Insumo no encontrado.', 'error');
+                return;
+            }
+            // Calcular costo unitario con impuesto incluido
+            const costoUnitarioNuevo = (precioTotal * (1 + impuesto / 100)) / cantidad;
+            // Costo unitario actual considerando merma e impuesto
+            const mermaFactor = (100 - (insumo.merma || 0)) / 100;
+            const baseActual = insumo.precioTotal / (insumo.contenido || 1);
+            const impActual = baseActual * (1 + (insumo.impuesto || 0) / 100);
+            const costoUnitarioActual = impActual / mermaFactor;
+            // Actualizar stock
+            const stockActual = insumo.stock || 0;
+            const nuevoStock = stockActual + cantidad;
+            // Costo promedio ponderado: (stockActual * costoUnitarioActual + cantidad * costoUnitarioNuevo) / nuevoStock
+            const costoPromedio = ((stockActual * costoUnitarioActual) + (cantidad * costoUnitarioNuevo)) / nuevoStock;
+            // Actualizar stock en insumo
+            insumo.stock = nuevoStock;
+            // Ajustar el precioTotal para reflejar el nuevo costo promedio. No modificamos el contenido ni el impuesto del insumo.
+            // Dado que el costo unitario se calcula como:
+            // costoUnitario = ((precioTotal / contenido) * (1 + impuesto/100)) / mermaFactor
+            // despejamos precioTotal para el nuevo costo promedio:
+            const updatedPrecioTotal = costoPromedio * (insumo.contenido || 1) * mermaFactor / (1 + (insumo.impuesto || 0) / 100);
+            insumo.precioTotal = updatedPrecioTotal;
+            // Guardar cambios en inventario
+            inventario[insumoIndex] = insumo;
+            setData(StorageKeys.inventario, inventario);
+            // Registrar gasto en transacciones (categoría Compra Inventario)
+            const fechaInput = document.getElementById('operacionDate');
+            if (!fechaInput.value) {
+                const today = new Date();
+                const pad = (n) => n.toString().padStart(2, '0');
+                fechaInput.value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+            }
+            const key = dateKey(fechaInput.value);
+            const transacciones = getData(StorageKeys.transacciones);
+            if (!transacciones[key]) {
+                transacciones[key] = { ventas: [], gastos: [], gastosOperativos: [] };
+            }
+            transacciones[key].gastos.push({ descripcion: `Compra de ${insumo.nombre}`, monto: precioTotal * (1 + impuesto / 100), categoria: 'Compra Inventario', hora: timestamp() });
+            setData(StorageKeys.transacciones, transacciones);
+            toggleModal('compraModal');
+            refreshInventarioList();
+            refreshGastos();
+            refreshOperacionesUI();
+            refreshFinanzas();
+            refreshAnalisis();
+            showToast('Compra registrada correctamente.', 'success');
+        }
+
+        /************************************************************************
+         *    Sección de Clientes
+         *
+         * Gestiona clientes a partir de las ventas registradas. Cada
+         * cliente se identifica por su nombre, teléfono o email. Se
+         * acumulan sus compras totales, número de visitas y fecha de
+         * última visita. Esta sección muestra un listado con el gasto
+         * total y visitas por cliente, ordenado por el gasto.
+         ************************************************************************/
+        function updateClientes(venta) {
+            // Actualizar lista de clientes tras una venta con datos de cliente
+            const cliente = venta.cliente;
+            if (!cliente) return;
+            const nombre = cliente.nombre || '';
+            const telefono = cliente.telefono || '';
+            const email = cliente.email || '';
+            if (!nombre && !telefono && !email) return;
+            const clientes = getData(StorageKeys.clientes) || [];
+            // Buscar cliente existente por coincidencia de nombre o contacto
+            let idxFound = -1;
+            clientes.forEach((c, idx) => {
+                if ((nombre && c.nombre === nombre) || (telefono && c.telefono === telefono) || (email && c.email === email)) {
+                    idxFound = idx;
+                }
+            });
+            // Usar la hora de la venta para determinar la fecha de última visita
+            const dateStr = dateKey(venta.hora);
+            if (idxFound >= 0) {
+                clientes[idxFound].totalGasto += venta.precio;
+                clientes[idxFound].totalVisitas += 1;
+                clientes[idxFound].lastVisit = dateStr;
+            } else {
+                clientes.push({ nombre: nombre, telefono: telefono, email: email, totalGasto: venta.precio, totalVisitas: 1, lastVisit: dateStr });
+            }
+            setData(StorageKeys.clientes, clientes);
+        }
+        function refreshClientes() {
+            const listDiv = document.getElementById('clientesList');
+            listDiv.innerHTML = '';
+            const clientes = getData(StorageKeys.clientes) || [];
+            if (clientes.length === 0) {
+                document.getElementById('clientesResumen').textContent = 'No hay clientes registrados.';
+                // Mostrar mensaje vacío en la lista
+                showEmptyList(listDiv, 'No hay clientes registrados.');
+                return;
+            }
+            // Calcular gasto total para promedio
+            let gastoTotal = 0;
+            clientes.forEach(c => gastoTotal += c.totalGasto);
+            const promedio = gastoTotal / clientes.length;
+            // Encontrar cliente top
+            const topCliente = clientes.reduce((max,c) => c.totalGasto > max.totalGasto ? c : max, clientes[0]);
+            document.getElementById('clientesResumen').innerHTML = `Total de clientes: ${clientes.length}<br>` +
+                `Gasto total: ${gastoTotal.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                `Ticket promedio por cliente: ${promedio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                `Cliente que más gasta: ${topCliente.nombre || topCliente.telefono || topCliente.email} (${topCliente.totalGasto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda})`;
+            // Ordenar clientes por gasto total desc
+            clientes.sort((a,b) => b.totalGasto - a.totalGasto);
+            clientes.forEach(c => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `<strong>${c.nombre || '(sin nombre)'}</strong><br>` +
+                    `${c.telefono ? 'Tel: ' + c.telefono + '<br>' : ''}` +
+                    `${c.email ? 'Email: ' + c.email + '<br>' : ''}` +
+                    `Total Gasto: ${c.totalGasto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                    `Visitas: ${c.totalVisitas}<br>` +
+                    `Última Visita: ${c.lastVisit}`;
+                listDiv.appendChild(card);
+            });
+        }
+
+        /************************************************************************
+         *    Sección de Empleados y Nómina
+         *
+         * Permite registrar empleados con su rol, salario por hora y horas
+         * trabajadas en el periodo actual. Se calcula el costo total de
+         * nómina por empleado (salarioHora * horas) y se muestra un
+         * resumen acumulado. La sección también permite editar o
+         * eliminar empleados. El costo de nómina se incluye en el
+         * análisis financiero.
+         ************************************************************************/
+        function refreshEmpleados() {
+            const lista = document.getElementById('empleadosList');
+            lista.innerHTML = '';
+            const empleados = getData(StorageKeys.empleados) || [];
+            empleados.forEach((emp, idx) => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                // Calcular costo de nómina (si no está guardado)
+                const costo = (emp.salarioHora || 0) * (emp.horas || 0);
+                emp.costoNominaTotal = costo;
+                div.innerHTML = `<strong>${emp.nombre}</strong> - Rol: ${emp.rol}<br>Salario hora: ${emp.salarioHora.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}, Horas: ${emp.horas}<br>Costo nómina: ${costo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                    `<button data-idx="${idx}" class="editEmpleadoBtn">Editar</button> ` +
+                    `<button data-idx="${idx}" class="deleteEmpleadoBtn">Eliminar</button>`;
+                lista.appendChild(div);
+            });
+            // Eventos para editar/eliminar
+            lista.querySelectorAll('.editEmpleadoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    editEmpleado(index);
+                });
+            });
+            lista.querySelectorAll('.deleteEmpleadoBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.getAttribute('data-idx');
+                    if (confirm('¿Eliminar este empleado?')) {
+                        const emps = getData(StorageKeys.empleados);
+                        emps.splice(index, 1);
+                        setData(StorageKeys.empleados, emps);
+                        refreshEmpleados();
+                        updateNominaResumen();
+                        refreshAnalisis();
+                        refreshGastos();
+                    }
+                });
+            });
+            updateNominaResumen();
+            // Estado vacío para empleados
+            if (empleados.length === 0) {
+                showEmptyList(lista, 'No hay empleados registrados.');
+            }
+        }
+        function saveEmpleado() {
+            const nombre = document.getElementById('empNombre').value.trim();
+            const rol = document.getElementById('empRol').value;
+            const salarioHora = parseFloat(document.getElementById('empSalarioHora').value) || 0;
+            const horas = parseFloat(document.getElementById('empHoras').value) || 0;
+            if (!nombre || salarioHora <= 0) {
+                showToast('Ingresa el nombre y salario por hora válidos.', 'error');
+                return;
+            }
+            const empleados = getData(StorageKeys.empleados) || [];
+            const idx = document.getElementById('saveEmpleadoBtn').dataset.index;
+            const costoNominaTotal = salarioHora * horas;
+            const empleado = { nombre, rol, salarioHora, horas, costoNominaTotal, timestamp: timestamp() };
+            if (idx === '') {
+                empleados.push(empleado);
+            } else {
+                empleados[idx] = empleado;
+            }
+            setData(StorageKeys.empleados, empleados);
+            toggleModal('empleadoModal');
+            refreshEmpleados();
+            refreshAnalisis();
+            refreshGastos();
+            showToast('Empleado guardado correctamente.', 'success');
+        }
+        function editEmpleado(index) {
+            const emp = getData(StorageKeys.empleados)[index];
+            document.getElementById('empNombre').value = emp.nombre;
+            document.getElementById('empRol').value = emp.rol;
+            document.getElementById('empSalarioHora').value = emp.salarioHora;
+            document.getElementById('empHoras').value = emp.horas;
+            document.getElementById('saveEmpleadoBtn').dataset.index = index;
+            toggleModal('empleadoModal');
+        }
+        function updateNominaResumen() {
+            const empleados = getData(StorageKeys.empleados) || [];
+            let total = 0;
+            empleados.forEach(emp => {
+                const costo = (emp.salarioHora || 0) * (emp.horas || 0);
+                total += costo;
+            });
+            const cfg = getData(StorageKeys.config);
+            if (empleados.length) {
+                // Calcular ingresos y utilidades mensuales aproximados para estimar capacidad de pago
+                const trans = getData(StorageKeys.transacciones);
+                const hoy = new Date(document.getElementById('operacionDate').value || new Date());
+                let ingresosMes = 0;
+                let cogsMes = 0;
+                let gastosMes = 0;
+                let gastosFijosMes = 0;
+                Object.keys(trans).forEach(dateKeyStr => {
+                    const dateObj = new Date(dateKeyStr);
+                    if (dateObj.getMonth() === hoy.getMonth() && dateObj.getFullYear() === hoy.getFullYear()) {
+                        const t = trans[dateKeyStr];
+                        ingresosMes += t.ventas.reduce((sum,v) => sum + v.precio, 0);
+                        cogsMes += t.ventas.reduce((sum,v) => sum + v.cogs, 0);
+                        gastosMes += t.gastos.reduce((sum,g) => sum + g.monto, 0);
+                        gastosFijosMes += t.gastosOperativos.reduce((sum,g) => sum + g.monto, 0);
+                    }
+                });
+                const impuestoPorc = getData(StorageKeys.impuesto);
+                const impuestosMes = ingresosMes * impuestoPorc / 100;
+                const utilNetMes = ingresosMes - cogsMes - gastosMes - gastosFijosMes - impuestosMes - total;
+                const salarioPromedio = total / empleados.length;
+                const sostenibles = salarioPromedio > 0 ? (utilNetMes / salarioPromedio) : 0;
+                const sosteniblesFloor = sostenibles > 0 ? Math.floor(sostenibles) : 0;
+                document.getElementById('nominaResumen').innerHTML = `Número de empleados: ${empleados.length}<br>Total nómina: ${total.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                    `Utilidad neta mensual estimada: ${utilNetMes.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                    `Empleados sostenibles con utilidades: ${sosteniblesFloor}`;
+            } else {
+                document.getElementById('nominaResumen').innerHTML = 'No hay empleados registrados.';
+            }
+        }
+
+        /************************************************************************
+         *    Gasto avanzado: seleccionar insumo y mostrar costo
+         ************************************************************************/
+        function populateGastoInsumos() {
+            const select = document.getElementById('gastoInsumoSelect');
+            if (!select) return;
+            select.innerHTML = '<option value="">-- Seleccionar insumo --</option>';
+            const inventario = getData(StorageKeys.inventario) || [];
+            inventario.forEach((ins, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = ins.nombre;
+                select.appendChild(opt);
+            });
+            // También rellenar productos disponibles para gastos con datalist
+            const prodDatalist = document.getElementById('gastoProductosDatalist');
+            if (prodDatalist) {
+                prodDatalist.innerHTML = '';
+                const productos = getData(StorageKeys.productos) || [];
+                // Obtener símbolo de moneda para mostrar en las sugerencias de productos
+                const cfgP = getData(StorageKeys.config) || {};
+                const symbolP = cfgP.simboloMoneda || '';
+                productos.forEach((p) => {
+                    const optP = document.createElement('option');
+                    optP.value = p.nombre;
+                    // Incluir el precio en la etiqueta para una experiencia de búsqueda más informativa
+                    if (symbolP) {
+                        optP.label = `${p.nombre} - ${symbolP}${p.precio}`;
+                    } else {
+                        optP.label = `${p.nombre} - ${p.precio}`;
+                    }
+                    prodDatalist.appendChild(optP);
+                });
+            }
+        }
+
+        function updateGastoInsumoCost() {
+            const sel = document.getElementById('gastoInsumoSelect');
+            const qtyInput = document.getElementById('gastoInsumoCantidad');
+            const costP = document.getElementById('gastoInsumoCosto');
+            if (!sel || !qtyInput || !costP) return;
+            const idx = sel.value;
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (idx !== '' && !isNaN(idx) && qty > 0) {
+                const inventario = getData(StorageKeys.inventario) || [];
+                const ins = inventario[idx];
+                if (ins) {
+                    const mermaFactor = (100 - (ins.merma || 0)) / 100;
+                    const base = ins.precioTotal / (ins.contenido || 1);
+                    const unitario = base * (1 + (ins.impuesto || 0) / 100) / mermaFactor;
+                    const cost = unitario * qty;
+                    const cfg = getData(StorageKeys.config);
+                    costP.textContent = `Costo estimado: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
+                    return;
+                }
+            }
+            costP.textContent = '';
+        }
+
+        /**
+         * Actualiza el coste estimado cuando se selecciona un producto en el
+         * registro de gastos. El costo se calcula como precio de venta por
+         * cantidad. No se revela el costo real de ingredientes.
+         */
+        function updateGastoProductoCost() {
+            const prodInput = document.getElementById('gastoProductoInput');
+            const qtyInput = document.getElementById('gastoProductoCantidad');
+            const costP = document.getElementById('gastoProductoCosto');
+            if (!prodInput || !qtyInput || !costP) return;
+            const prodName = prodInput.value.trim();
+            const qty = parseFloat(qtyInput.value) || 0;
+            if (prodName !== '' && qty > 0) {
+                const productos = getData(StorageKeys.productos) || [];
+                const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
+                if (prod) {
+                    const cost = prod.precio * qty;
+                    const cfg = getData(StorageKeys.config);
+                    costP.textContent = `Costo estimado por producto: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
+                    return;
+                }
+            }
+            costP.textContent = '';
+        }
+
+        /************************************************************************
+         *    Modo Pantalla Completa
+         ************************************************************************/
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch((err) => {
+                    console.error(err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+    </script>
+</body>
+</html>
