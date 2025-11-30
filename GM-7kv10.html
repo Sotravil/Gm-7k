@@ -216,6 +216,21 @@
             background-color: #181818;
         }
 
+        /* Colores para ingresos y egresos */
+        /* Elementos con ingresos (ganancias o entradas de dinero) se muestran en verde */
+        .income {
+            color: #4caf50;
+        }
+        /* Elementos con egresos (gastos, costos o pérdidas) se muestran en rojo */
+        .expense {
+            color: #f44336;
+        }
+
+        /* El campo de saldo del banco siempre muestra el número en verde, ya que representa presupuesto disponible */
+        #bankBudgetInput {
+            color: #4caf50;
+        }
+
         /* ----------- UI/UX Enhancements ----------- */
         /* Toast notifications */
         #toast {
@@ -1017,6 +1032,25 @@
             }, 3000);
         }
 
+        /**
+         * Aplica las clases de estilo apropiadas a un elemento en función del valor numérico.
+         * Los valores positivos o cero se consideran ingresos y se pintan de verde; los negativos
+         * se consideran egresos y se pintan de rojo. Si el elemento ya tiene otra clase de
+         * ingreso/egreso se reemplazará por la nueva según el valor.
+         * @param {HTMLElement} el - Elemento DOM al que aplicar la clase
+         * @param {number} value - Valor numérico que determinará el color
+         */
+        function colorizeElement(el, value) {
+            if (!el) return;
+            if (value < 0) {
+                el.classList.remove('income');
+                el.classList.add('expense');
+            } else {
+                el.classList.remove('expense');
+                el.classList.add('income');
+            }
+        }
+
         // Detecta el dispositivo basándose en userAgent. Valores posibles:
         // 'Android', 'iOS', 'Windows Phone', 'Desktop'.
         let detectedDevice = 'Desktop';
@@ -1073,10 +1107,21 @@
             gastosOps.forEach(g => gastos += g.monto);
             const util = ingresos - cogsTotal - gastos;
             const ticketProm = ventas.length ? (ingresos / ventas.length) : 0;
-            document.getElementById('kpiIngresosHoy').textContent = cfg.simboloMoneda + ' ' + ingresos.toFixed(2);
-            document.getElementById('kpiGastosHoy').textContent = cfg.simboloMoneda + ' ' + gastos.toFixed(2);
-            document.getElementById('kpiUtilidadHoy').textContent = cfg.simboloMoneda + ' ' + util.toFixed(2);
-            document.getElementById('kpiTicketPromHoy').textContent = cfg.simboloMoneda + ' ' + ticketProm.toFixed(2);
+            // Mostrar los valores con el símbolo de moneda y aplicar el color correcto
+            const kpiIngresosEl = document.getElementById('kpiIngresosHoy');
+            const kpiGastosEl = document.getElementById('kpiGastosHoy');
+            const kpiUtilEl = document.getElementById('kpiUtilidadHoy');
+            const kpiTicketEl = document.getElementById('kpiTicketPromHoy');
+            kpiIngresosEl.textContent = cfg.simboloMoneda + ' ' + ingresos.toFixed(2);
+            kpiGastosEl.textContent = cfg.simboloMoneda + ' ' + gastos.toFixed(2);
+            kpiUtilEl.textContent = cfg.simboloMoneda + ' ' + util.toFixed(2);
+            kpiTicketEl.textContent = cfg.simboloMoneda + ' ' + ticketProm.toFixed(2);
+            // Colorizar según su naturaleza (ingresos positivos, gastos negativos)
+            colorizeElement(kpiIngresosEl, ingresos);
+            colorizeElement(kpiGastosEl, -gastos);
+            colorizeElement(kpiUtilEl, util);
+            // El ticket promedio siempre es un valor positivo, se considera ingreso
+            colorizeElement(kpiTicketEl, ticketProm);
         }
 
         // Permitir cerrar cualquier modal activo pulsando Esc
@@ -1600,6 +1645,7 @@
             const lista = document.getElementById('inventarioList');
             lista.innerHTML = '';
             const inventario = getData(StorageKeys.inventario);
+            const cfgInv = getData(StorageKeys.config);
             inventario.forEach((insumo, idx) => {
                 const div = document.createElement('div');
                 div.className = 'card';
@@ -1611,7 +1657,8 @@
                 const categoriaInfo = insumo.categoria ? `<br>Categoría: ${insumo.categoria}` : '';
                 // Ajustar la precisión de decimales: si el costo es muy pequeño, mostrar 4 decimales para evitar que aparezca 0.00
                 const decimals = costoUnitario < 0.01 ? 4 : 2;
-                div.innerHTML = `<strong>${insumo.nombre}</strong>${categoriaInfo}<br>Costo unitario real: ${costoUnitario.toFixed(decimals)} ${getData(StorageKeys.config).simboloMoneda} por ${insumo.unidad}${stockInfo}<br>` +
+                const costHtml = `<span class="expense">${costoUnitario.toFixed(decimals)} ${cfgInv.simboloMoneda}</span>`;
+                div.innerHTML = `<strong>${insumo.nombre}</strong>${categoriaInfo}<br>Costo unitario real: ${costHtml} por ${insumo.unidad}${stockInfo}<br>` +
                     `<button data-idx="${idx}" class="editInsumoBtn">Editar</button> ` +
                     `<button data-idx="${idx}" class="deleteInsumoBtn">Eliminar</button>`;
                 lista.appendChild(div);
@@ -1844,8 +1891,11 @@
                 });
                 const div = document.createElement('div');
                 div.className = 'card';
-                div.innerHTML = `<strong>${prod.nombre}</strong> - Precio: ${prod.precio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} <br>` +
-                    `Costo de preparación (COGS): ${costo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                const cfgP = getData(StorageKeys.config);
+                const priceHtml = `<span class="income">${prod.precio.toFixed(2)} ${cfgP.simboloMoneda}</span>`;
+                const cogsHtml = `<span class="expense">${costo.toFixed(2)} ${cfgP.simboloMoneda}</span>`;
+                div.innerHTML = `<strong>${prod.nombre}</strong> - Precio: ${priceHtml} <br>` +
+                    `Costo de preparación (COGS): ${cogsHtml}<br>` +
                     `<button data-idx="${idx}" class="editProductoBtn">Editar</button> ` +
                     `<button data-idx="${idx}" class="deleteProductoBtn">Eliminar</button>`;
                 lista.appendChild(div);
@@ -1965,13 +2015,17 @@
                 transacciones[key] = { ventas: [], gastos: [], gastosOperativos: [] };
                 setData(StorageKeys.transacciones, transacciones);
             }
+            // Obtener configuración una vez para usar símbolo de moneda y colores
+            const cfg = getData(StorageKeys.config);
             // Mostrar ventas
             const ventasDiv = document.getElementById('ventasList');
             ventasDiv.innerHTML = '';
             transacciones[key].ventas.forEach((venta, idx) => {
                 const div = document.createElement('div');
                 div.className = 'card';
-                div.innerHTML = `${venta.producto} x${venta.cantidad} - ${venta.precio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (COGS: ${venta.cogs.toFixed(2)})<br>` +
+                const precioHtml = `<span class="income">${venta.precio.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                const cogsHtml = `<span class="expense">${venta.cogs.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                div.innerHTML = `${venta.producto} x${venta.cantidad} - ${precioHtml} (COGS: ${cogsHtml})<br>` +
                     `<small>Pago: ${venta.pago}, ${venta.tipoServicio}${venta.mesa ? ', Mesa ' + venta.mesa : ''}</small><br>` +
                     `<button data-idx="${idx}" class="deleteVentaBtn">Eliminar</button>`;
                 ventasDiv.appendChild(div);
@@ -1994,7 +2048,8 @@
             transacciones[key].gastos.forEach((gasto, idx) => {
                 const div = document.createElement('div');
                 div.className = 'card';
-                div.innerHTML = `${gasto.descripcion} - ${gasto.monto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} (${gasto.categoria})<br>` +
+                const montoHtml = `<span class="expense">${gasto.monto.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                div.innerHTML = `${gasto.descripcion} - ${montoHtml} (${gasto.categoria})<br>` +
                     `<button data-idx="${idx}" class="deleteGastoBtn">Eliminar</button>`;
                 gastosDiv.appendChild(div);
             });
@@ -2016,7 +2071,8 @@
             const prorrateo = (gastosFijos.alquiler + gastosFijos.luz + gastosFijos.gas + gastosFijos.agua) / diasEnMes;
             transacciones[key].gastosOperativos = [{ monto: prorrateo, descripcion:'Gastos Fijos Prorrateados', hora: timestamp() }];
             setData(StorageKeys.transacciones, transacciones);
-            document.getElementById('gastosOperativosProrrateados').textContent = `${prorrateo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda} por día`;
+            // Mostrar gastos operativos prorrateados en rojo
+            document.getElementById('gastosOperativosProrrateados').innerHTML = `<span class="expense">${prorrateo.toFixed(2)} ${cfg.simboloMoneda}</span> por día`;
             // Actualiza análisis y KPIs después de modificar transacciones
             refreshAnalisis();
             updateKpis(key, transacciones[key]);
@@ -2334,10 +2390,29 @@
             const sumaMes = getSummary(totalMes);
             const sumaAnio = getSummary(totalAnio);
             // Actualizar HTML
-            document.getElementById('resumenDia').innerHTML = `<strong>Día:</strong> Ingresos ${sumaDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}, COGS ${sumaDia.cogs.toFixed(2)}, Gastos ${sumaDia.gastos.toFixed(2)}, Impuestos ${sumaDia.impuestos.toFixed(2)}, Ganancia ${sumaDia.ganancia.toFixed(2)} (${sumaDia.margen.toFixed(2)}%)`;
-            document.getElementById('resumenSemana').innerHTML = `<strong>Semana:</strong> Ingresos ${sumaSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaSemana.ganancia.toFixed(2)} (${sumaSemana.margen.toFixed(2)}%)`;
-            document.getElementById('resumenMes').innerHTML = `<strong>Mes:</strong> Ingresos ${sumaMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaMes.ganancia.toFixed(2)} (${sumaMes.margen.toFixed(2)}%)`;
-            document.getElementById('resumenAnio').innerHTML = `<strong>Año:</strong> Ingresos ${sumaAnio.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ganancia ${sumaAnio.ganancia.toFixed(2)} (${sumaAnio.margen.toFixed(2)}%)`;
+            // Formatear números con colores según su naturaleza
+            const ingresoDiaHtml = `<span class="income">${sumaDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const cogsDiaHtml = `<span class="expense">${sumaDia.cogs.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const gastosDiaHtml = `<span class="expense">${sumaDia.gastos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const impuestosDiaHtml = `<span class="expense">${sumaDia.impuestos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const utilDiaClass = sumaDia.ganancia >= 0 ? 'income' : 'expense';
+            const utilDiaHtml = `<span class="${utilDiaClass}">${sumaDia.ganancia.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('resumenDia').innerHTML = `<strong>Día:</strong> Ingresos ${ingresoDiaHtml}, COGS ${cogsDiaHtml}, Gastos ${gastosDiaHtml}, Impuestos ${impuestosDiaHtml}, Ganancia ${utilDiaHtml} (${sumaDia.margen.toFixed(2)}%)`;
+            // Semana
+            const ingresoSemanaHtml = `<span class="income">${sumaSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const utilSemanaClass = sumaSemana.ganancia >= 0 ? 'income' : 'expense';
+            const utilSemanaHtml = `<span class="${utilSemanaClass}">${sumaSemana.ganancia.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('resumenSemana').innerHTML = `<strong>Semana:</strong> Ingresos ${ingresoSemanaHtml}, Ganancia ${utilSemanaHtml} (${sumaSemana.margen.toFixed(2)}%)`;
+            // Mes
+            const ingresoMesHtml = `<span class="income">${sumaMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const utilMesClass = sumaMes.ganancia >= 0 ? 'income' : 'expense';
+            const utilMesHtml = `<span class="${utilMesClass}">${sumaMes.ganancia.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('resumenMes').innerHTML = `<strong>Mes:</strong> Ingresos ${ingresoMesHtml}, Ganancia ${utilMesHtml} (${sumaMes.margen.toFixed(2)}%)`;
+            // Año
+            const ingresoAnioHtml = `<span class="income">${sumaAnio.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            const utilAnioClass = sumaAnio.ganancia >= 0 ? 'income' : 'expense';
+            const utilAnioHtml = `<span class="${utilAnioClass}">${sumaAnio.ganancia.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('resumenAnio').innerHTML = `<strong>Año:</strong> Ingresos ${ingresoAnioHtml}, Ganancia ${utilAnioHtml} (${sumaAnio.margen.toFixed(2)}%)`;
             // Auditoría
             const detalles = [];
             detalles.push(`Ganancia Neta Día = Ingresos (${sumaDia.ingresos.toFixed(2)}) - COGS (${sumaDia.cogs.toFixed(2)}) - Gastos (${(totalDia.gastos+totalDia.gastosFijos).toFixed(2)}) - Nómina (${nominaTotal.toFixed(2)}) - Impuestos (${sumaDia.impuestos.toFixed(2)}) = ${sumaDia.ganancia.toFixed(2)}`);
@@ -2367,7 +2442,13 @@
                 const gananciaBruta = prod.precio - cogs;
                 const margen = prod.precio ? (gananciaBruta / prod.precio) * 100 : 0;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${prod.nombre}</td><td>${prod.precio.toFixed(2)}</td><td>${cogs.toFixed(2)}</td><td>${gananciaBruta.toFixed(2)}</td><td>${margen.toFixed(2)}%</td>`;
+                const priceHtml = `<span class="income">${prod.precio.toFixed(2)}</span>`;
+                const cogsHtml = `<span class="expense">${cogs.toFixed(2)}</span>`;
+                const gainClass = gananciaBruta >= 0 ? 'income' : 'expense';
+                const gainHtml = `<span class="${gainClass}">${gananciaBruta.toFixed(2)}</span>`;
+                const marginClass = margen >= 0 ? 'income' : 'expense';
+                const marginHtml = `<span class="${marginClass}">${margen.toFixed(2)}%</span>`;
+                tr.innerHTML = `<td>${prod.nombre}</td><td>${priceHtml}</td><td>${cogsHtml}</td><td>${gainHtml}</td><td>${marginHtml}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -2377,11 +2458,18 @@
             const minVal = gananciaMensual * 12;
             const maxVal = gananciaMensual * 24;
             const cfg = getData(StorageKeys.config);
+            // Determinar estado del negocio según la ganancia mensual
             let estado = '';
             if (gananciaMensual > 0) estado = 'El negocio está generando ganancias.';
             else if (gananciaMensual === 0) estado = 'El negocio está en equilibrio.';
             else estado = 'El negocio está generando pérdidas. Requiere reestructuración.';
-            document.getElementById('valoracionNegocio').textContent = `Valoración estimada: entre ${minVal.toFixed(2)} y ${maxVal.toFixed(2)} ${cfg.simboloMoneda}. ${estado}`;
+            // Elegir la clase de color para la valoración (verde para valoraciones positivas o cero, rojo para negativas)
+            const valClass = gananciaMensual >= 0 ? 'income' : 'expense';
+            // Construir HTML con valores coloreados
+            const minValHtml = `<span class="${valClass}">${minVal.toFixed(2)}</span>`;
+            const maxValHtml = `<span class="${valClass}">${maxVal.toFixed(2)}</span>`;
+            document.getElementById('valoracionNegocio').innerHTML =
+                `Valoración estimada: entre ${minValHtml} y ${maxValHtml} ${cfg.simboloMoneda}. ${estado}`;
         }
 
         /************************************************************************
@@ -2426,8 +2514,8 @@
                     const div = document.createElement('div');
                     div.className = 'card';
                     div.innerHTML = `<strong>${prodNombre}</strong><br>` +
-                        `Ingresos brutos: ${data.bruto.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                        `Ingresos netos (sin impuestos): ${data.neto.toFixed(2)} ${cfg.simboloMoneda}`;
+                        `Ingresos brutos: <span class="income">${data.bruto.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                        `Ingresos netos (sin impuestos): <span class="income">${data.neto.toFixed(2)} ${cfg.simboloMoneda}</span>`;
                     container.appendChild(div);
                 }
             });
@@ -2515,16 +2603,16 @@
                 if (trans.ventas.length) {
                     hist += '<em>Ventas:</em><br>';
                     trans.ventas.forEach(v => {
-                        hist += `${v.hora}: ${v.producto} - ${v.precio.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                        hist += `${v.hora}: ${v.producto} - <span class="income">${v.precio.toFixed(2)} ${cfg.simboloMoneda}</span><br>`;
                     });
                 }
                 if (trans.gastos.length || trans.gastosOperativos.length) {
                     hist += '<em>Gastos:</em><br>';
                     trans.gastos.forEach(g => {
-                        hist += `${g.hora}: ${g.descripcion} - ${g.monto.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                        hist += `${g.hora}: ${g.descripcion} - <span class="expense">${g.monto.toFixed(2)} ${cfg.simboloMoneda}</span><br>`;
                     });
                     trans.gastosOperativos.forEach(go => {
-                        hist += `${go.descripcion}: ${go.monto.toFixed(2)} ${cfg.simboloMoneda}<br>`;
+                        hist += `${go.descripcion}: <span class="expense">${go.monto.toFixed(2)} ${cfg.simboloMoneda}</span><br>`;
                     });
                 }
                 hist += '</div>';
@@ -2541,11 +2629,13 @@
             // Calcular métricas adicionales
             const balanceActual = cashBalance + bankBalance;
             // Mostrar saldos detallados
-            document.getElementById('finanzasSaldo').innerHTML = `Efectivo: ${cashBalance.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                `Banco: ${bankBalance.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                `Ganado hoy: ${totalIngresoHoy.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                `Gastado histórico: ${totalGastoHistorico.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                `Balance actual: ${balanceActual.toFixed(2)} ${cfg.simboloMoneda}`;
+            // Mostrar saldos con colores: ingresos en verde, gastos en rojo, balance según signo
+            document.getElementById('finanzasSaldo').innerHTML =
+                `Efectivo: <span class="income">${cashBalance.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Banco: <span class="income">${bankBalance.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Ganado hoy: <span class="income">${totalIngresoHoy.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Gastado histórico: <span class="expense">${totalGastoHistorico.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Balance actual: <span class="${balanceActual >= 0 ? 'income' : 'expense'}">${balanceActual.toFixed(2)} ${cfg.simboloMoneda}</span>`;
             // Resúmenes por periodo
             // Calcular impuestos para ingresos de cada periodo y mostrar ingresos netos (ingresos - impuestos)
             const impuestoPorc = getData(StorageKeys.impuesto);
@@ -2555,9 +2645,25 @@
             const ingresosNetosDia = totalDia.ingresos - impuestosDia;
             const ingresosNetosSemana = totalSemana.ingresos - impuestosSemana;
             const ingresosNetosMes = totalMes.ingresos - impuestosMes;
-            document.getElementById('finanzasResumenDia').innerHTML = `<strong>Hoy:</strong> Ingresos brutos ${totalDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosDia.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalDia.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosDia - totalDia.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
-            document.getElementById('finanzasResumenSemana').innerHTML = `<strong>Semana:</strong> Ingresos brutos ${totalSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosSemana.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalSemana.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosSemana - totalSemana.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
-            document.getElementById('finanzasResumenMes').innerHTML = `<strong>Mes:</strong> Ingresos brutos ${totalMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}, Ingresos netos ${ingresosNetosMes.toFixed(2)} ${cfg.simboloMoneda}, Gastos ${totalMes.gastos.toFixed(2)} ${cfg.simboloMoneda}, Utilidad ${(ingresosNetosMes - totalMes.gastos).toFixed(2)} ${cfg.simboloMoneda}`;
+            // Calcular utilidades netas para cada periodo
+            const utilDia = ingresosNetosDia - totalDia.gastos;
+            const utilSemana = ingresosNetosSemana - totalSemana.gastos;
+            const utilMes = ingresosNetosMes - totalMes.gastos;
+            document.getElementById('finanzasResumenDia').innerHTML =
+                `<strong>Hoy:</strong> Ingresos brutos <span class="income">${totalDia.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Ingresos netos <span class="income">${ingresosNetosDia.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Gastos <span class="expense">${totalDia.gastos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Utilidad <span class="${utilDia >= 0 ? 'income' : 'expense'}">${utilDia.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('finanzasResumenSemana').innerHTML =
+                `<strong>Semana:</strong> Ingresos brutos <span class="income">${totalSemana.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Ingresos netos <span class="income">${ingresosNetosSemana.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Gastos <span class="expense">${totalSemana.gastos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Utilidad <span class="${utilSemana >= 0 ? 'income' : 'expense'}">${utilSemana.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+            document.getElementById('finanzasResumenMes').innerHTML =
+                `<strong>Mes:</strong> Ingresos brutos <span class="income">${totalMes.ingresos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Ingresos netos <span class="income">${ingresosNetosMes.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Gastos <span class="expense">${totalMes.gastos.toFixed(2)} ${cfg.simboloMoneda}</span>, ` +
+                `Utilidad <span class="${utilMes >= 0 ? 'income' : 'expense'}">${utilMes.toFixed(2)} ${cfg.simboloMoneda}</span>`;
             document.getElementById('finanzasHistorial').innerHTML = hist;
         }
 
@@ -2718,13 +2824,13 @@
                 t.gastosOperativos.forEach(go => todosGastos.push({ fecha: dateKeyStr, tipo: 'Operativo', descripcion: go.descripcion, monto: go.monto, categoria: 'Gastos Fijos', hora: go.hora || timestamp() }));
                 todosGastos.forEach(item => {
                     resumen[item.categoria] = (resumen[item.categoria] || 0) + item.monto;
-                    listaHtml += `<div class="card"><strong>${item.fecha}</strong><br>${item.descripcion} - ${item.monto.toFixed(2)} ${cfg.simboloMoneda}<br><small>Categoría: ${item.categoria}, Tipo: ${item.tipo}</small></div>`;
+                    listaHtml += `<div class="card"><strong>${item.fecha}</strong><br>${item.descripcion} - <span class="expense">${item.monto.toFixed(2)} ${cfg.simboloMoneda}</span><br><small>Categoría: ${item.categoria}, Tipo: ${item.tipo}</small></div>`;
                 });
             });
             // Construir resumen HTML
             let resumenHtml = '';
             Object.keys(resumen).forEach(cat => {
-                resumenHtml += `<p><strong>${cat}:</strong> ${resumen[cat].toFixed(2)} ${cfg.simboloMoneda}</p>`;
+                resumenHtml += `<p><strong>${cat}:</strong> <span class="expense">${resumen[cat].toFixed(2)} ${cfg.simboloMoneda}</span></p>`;
             });
             // Incluir nómina en el resumen de gastos
             const empleados = getData(StorageKeys.empleados) || [];
@@ -2733,7 +2839,7 @@
                 totalNomina += (emp.salarioHora || 0) * (emp.horas || 0);
             });
             if (totalNomina > 0) {
-                resumenHtml += `<p><strong>Nómina:</strong> ${totalNomina.toFixed(2)} ${cfg.simboloMoneda}</p>`;
+                resumenHtml += `<p><strong>Nómina:</strong> <span class="expense">${totalNomina.toFixed(2)} ${cfg.simboloMoneda}</span></p>`;
             }
             document.getElementById('gastosResumenCategorias').innerHTML = resumenHtml || '<p>No hay gastos registrados.</p>';
             document.getElementById('gastosListaCompleta').innerHTML = listaHtml || '<p>No hay gastos registrados.</p>';
@@ -2842,13 +2948,15 @@
                         utilidadNeta = ingresos - costoProducto - e.costo;
                     }
                 }
-                const utilidadInfo = utilidadNeta !== null ? `<br><em>Utilidad neta después de logística:</em> ${utilidadNeta.toFixed(2)} ${cfg.simboloMoneda}` : '';
+                const utilClass = utilidadNeta !== null && utilidadNeta >= 0 ? 'income' : 'expense';
+                const utilidadInfo = utilidadNeta !== null ? `<br><em>Utilidad neta después de logística:</em> <span class="${utilClass}">${utilidadNeta.toFixed(2)} ${cfg.simboloMoneda}</span>` : '';
                 const direccionInfo = e.direccion ? `<br>Dirección: ${e.direccion}` : '';
                 const tiempoInfo = e.tiempo ? `${e.tiempo} min` : 'N/A';
-                listHtml.push(`<div class="card"><strong>${e.date}</strong><br>${e.producto} (${e.ventaHora})<br>Distancia: ${e.distancia} km, Tiempo: ${tiempoInfo}<br>Transporte: ${e.transporte}, Costo: ${e.costo.toFixed(2)} ${cfg.simboloMoneda}${direccionInfo}${utilidadInfo}</div>`);
+                const costoHtml = `<span class="expense">${e.costo.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                listHtml.push(`<div class="card"><strong>${e.date}</strong><br>${e.producto} (${e.ventaHora})<br>Distancia: ${e.distancia} km, Tiempo: ${tiempoInfo}<br>Transporte: ${e.transporte}, Costo: ${costoHtml}${direccionInfo}${utilidadInfo}</div>`);
             });
             const avgCost = totalCost / events.length;
-            document.getElementById('logisticaResumen').innerHTML = `Total entregas: ${events.length}<br>Total costo: ${totalCost.toFixed(2)} ${cfg.simboloMoneda}<br>Costo promedio por entrega: ${avgCost.toFixed(2)} ${cfg.simboloMoneda}`;
+            document.getElementById('logisticaResumen').innerHTML = `Total entregas: ${events.length}<br>Total costo: <span class="expense">${totalCost.toFixed(2)} ${cfg.simboloMoneda}</span><br>Costo promedio por entrega: <span class="expense">${avgCost.toFixed(2)} ${cfg.simboloMoneda}</span>`;
             document.getElementById('logisticaList').innerHTML = listHtml.join('');
         }
 
@@ -3012,7 +3120,8 @@
             const qty = parseFloat(qtyField.value) || 0;
             const cfg = getData(StorageKeys.config);
             if (qty > 0) {
-                costLabel.textContent = (prod.precio * qty).toFixed(2) + ' ' + cfg.simboloMoneda;
+                const totalCost = (prod.precio * qty).toFixed(2) + ' ' + cfg.simboloMoneda;
+                costLabel.innerHTML = `<span class="expense">${totalCost}</span>`;
             }
             const suggestionsContainer = document.getElementById('gastoProductoSuggestions');
             suggestionsContainer.style.display = 'none';
@@ -3258,19 +3367,22 @@
             const promedio = gastoTotal / clientes.length;
             // Encontrar cliente top
             const topCliente = clientes.reduce((max,c) => c.totalGasto > max.totalGasto ? c : max, clientes[0]);
-            document.getElementById('clientesResumen').innerHTML = `Total de clientes: ${clientes.length}<br>` +
-                `Gasto total: ${gastoTotal.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
-                `Ticket promedio por cliente: ${promedio.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
-                `Cliente que más gasta: ${topCliente.nombre || topCliente.telefono || topCliente.email} (${topCliente.totalGasto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda})`;
+            const cfg = getData(StorageKeys.config);
+            document.getElementById('clientesResumen').innerHTML =
+                `Total de clientes: ${clientes.length}<br>` +
+                `Gasto total: <span class="income">${gastoTotal.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Ticket promedio por cliente: <span class="income">${promedio.toFixed(2)} ${cfg.simboloMoneda}</span><br>` +
+                `Cliente que más gasta: ${topCliente.nombre || topCliente.telefono || topCliente.email} (<span class="income">${topCliente.totalGasto.toFixed(2)} ${cfg.simboloMoneda}</span>)`;
             // Ordenar clientes por gasto total desc
             clientes.sort((a,b) => b.totalGasto - a.totalGasto);
             clientes.forEach(c => {
                 const card = document.createElement('div');
                 card.className = 'card';
+                const amountHtml = `<span class="income">${c.totalGasto.toFixed(2)} ${cfg.simboloMoneda}</span>`;
                 card.innerHTML = `<strong>${c.nombre || '(sin nombre)'}</strong><br>` +
                     `${c.telefono ? 'Tel: ' + c.telefono + '<br>' : ''}` +
                     `${c.email ? 'Email: ' + c.email + '<br>' : ''}` +
-                    `Total Gasto: ${c.totalGasto.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                    `Total Gasto: ${amountHtml}<br>` +
                     `Visitas: ${c.totalVisitas}<br>` +
                     `Última Visita: ${c.lastVisit}`;
                 listDiv.appendChild(card);
@@ -3289,6 +3401,7 @@
          ************************************************************************/
         function refreshEmpleados() {
             const lista = document.getElementById('empleadosList');
+            const cfg = getData(StorageKeys.config);
             lista.innerHTML = '';
             const empleados = getData(StorageKeys.empleados) || [];
             empleados.forEach((emp, idx) => {
@@ -3297,7 +3410,9 @@
                 // Calcular costo de nómina (si no está guardado)
                 const costo = (emp.salarioHora || 0) * (emp.horas || 0);
                 emp.costoNominaTotal = costo;
-                div.innerHTML = `<strong>${emp.nombre}</strong> - Rol: ${emp.rol}<br>Salario hora: ${emp.salarioHora.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}, Horas: ${emp.horas}<br>Costo nómina: ${costo.toFixed(2)} ${getData(StorageKeys.config).simboloMoneda}<br>` +
+                const salarioHtml = `<span class="expense">${emp.salarioHora.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                const costoHtml = `<span class="expense">${costo.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                div.innerHTML = `<strong>${emp.nombre}</strong> - Rol: ${emp.rol}<br>Salario hora: ${salarioHtml}, Horas: ${emp.horas}<br>Costo nómina: ${costoHtml}<br>` +
                     `<button data-idx="${idx}" class="editEmpleadoBtn">Editar</button> ` +
                     `<button data-idx="${idx}" class="deleteEmpleadoBtn">Eliminar</button>`;
                 lista.appendChild(div);
@@ -3395,8 +3510,11 @@
                 const salarioPromedio = total / empleados.length;
                 const sostenibles = salarioPromedio > 0 ? (utilNetMes / salarioPromedio) : 0;
                 const sosteniblesFloor = sostenibles > 0 ? Math.floor(sostenibles) : 0;
-                document.getElementById('nominaResumen').innerHTML = `Número de empleados: ${empleados.length}<br>Total nómina: ${total.toFixed(2)} ${cfg.simboloMoneda}<br>` +
-                    `Utilidad neta mensual estimada: ${utilNetMes.toFixed(2)} ${cfg.simboloMoneda}<br>` +
+                const totalHtml = `<span class="expense">${total.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                const utilClass = utilNetMes >= 0 ? 'income' : 'expense';
+                const utilHtml = `<span class="${utilClass}">${utilNetMes.toFixed(2)} ${cfg.simboloMoneda}</span>`;
+                document.getElementById('nominaResumen').innerHTML = `Número de empleados: ${empleados.length}<br>Total nómina: ${totalHtml}<br>` +
+                    `Utilidad neta mensual estimada: ${utilHtml}<br>` +
                     `Empleados sostenibles con utilidades: ${sosteniblesFloor}`;
             } else {
                 document.getElementById('nominaResumen').innerHTML = 'No hay empleados registrados.';
@@ -3455,11 +3573,11 @@
                     const unitario = base * (1 + (ins.impuesto || 0) / 100) / mermaFactor;
                     const cost = unitario * qty;
                     const cfg = getData(StorageKeys.config);
-                    costP.textContent = `Costo estimado: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
+                    costP.innerHTML = `Costo estimado: <span class="expense">${cost.toFixed(2)} ${cfg.simboloMoneda}</span>`;
                     return;
                 }
             }
-            costP.textContent = '';
+            costP.innerHTML = '';
         }
 
         /**
@@ -3493,11 +3611,11 @@
             if (prod && qty > 0) {
                 const cost = prod.precio * qty;
                 const cfg = getData(StorageKeys.config);
-                costP.textContent = `Costo estimado por producto: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
+                costP.innerHTML = `Costo estimado por producto: <span class="expense">${cost.toFixed(2)} ${cfg.simboloMoneda}</span>`;
                 return;
             }
             // Si no hay coincidencias, limpiar el texto
-            costP.textContent = '';
+            costP.innerHTML = '';
         }
 
         /************************************************************************
