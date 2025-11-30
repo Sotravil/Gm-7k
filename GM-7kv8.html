@@ -273,6 +273,7 @@
             <button id="menuMyData">Mis Datos</button>
             <button id="menuClearData">Borrar Datos</button>
             <button id="menuHelp">Ayuda / Cómo Funciona</button>
+            <button class="primary" id="enterFullscreenBtn">Activar Pantalla Completa</button>
             <button id="menuAbout">Acerca de</button>
         </div>
     </header>
@@ -439,6 +440,18 @@
                 <h3>Resumen de Saldos</h3>
                 <p id="finanzasSaldo">Cargando...</p>
             </div>
+            <!-- Campo para registrar el saldo inicial en el banco.  Este valor
+                 se almacena en la configuración y se suma a los ingresos
+                 depositados para calcular el saldo total en banco.  El
+                 propietario puede introducir aquí cuánto presupuesto tiene
+                 disponible en su cuenta bancaria. -->
+            <div class="card">
+                <h3>Saldo inicial en Banco</h3>
+                <label>
+                    <input type="number" id="bankBudgetInput" min="0" step="0.01" placeholder="0">
+                </label>
+                <button class="primary" id="saveBankBudgetBtn">Guardar saldo banco</button>
+            </div>
             <div class="card">
                 <h3>Ingresos y Gastos</h3>
                 <p id="finanzasResumenDia"></p>
@@ -558,7 +571,7 @@
             <button class="close-btn" onclick="toggleModal('productoModal')">×</button>
             <h2>Agregar/Editar Producto</h2>
             <label>Nombre del Producto
-                <input type="text" id="prodNombre">
+                <input type="text" id="prodNombre" autocomplete="off" autocorrect="off" spellcheck="false">
             </label>
             <label>Precio de Venta
                 <input type="number" id="prodPrecio" min="0" step="0.01">
@@ -577,9 +590,12 @@
             <button class="close-btn" onclick="toggleModal('ventaModal')">×</button>
             <h2>Registrar Venta</h2>
             <label>Producto
-                <!-- Campo con búsqueda y sugerencias automáticas para productos registrados -->
-                <input type="text" id="ventaProductoInput" list="productosDatalist" placeholder="Buscar producto...">
-                <!-- Datalist con las opciones de productos disponibles, se llenará dinámicamente -->
+                <!-- Campo con búsqueda y sugerencias automáticas para productos registrados.
+                     Usamos un input normal con autocompletar desactivado y un contenedor de sugerencias personalizado -->
+                <input type="text" id="ventaProductoInput" placeholder="Buscar producto..." autocomplete="off" autocorrect="off" spellcheck="false" inputmode="search">
+                <!-- Contenedor para sugerencias dinámicas de productos -->
+                <div id="ventaProductoSuggestions" class="suggestions" style="position:relative;"></div>
+                <!-- Datalist vacío para compatibilidad futura (no usado por el buscador personalizado) -->
                 <datalist id="productosDatalist"></datalist>
             </label>
             <label>Cantidad
@@ -671,7 +687,10 @@
         <p id="gastoInsumoCosto" style="font-size:0.8rem; color:#aaa;"></p>
         <!-- Permite seleccionar un producto final para registrar consumo o ajuste -->
         <label>Producto (opcional)
-            <input type="text" id="gastoProductoInput" list="gastoProductosDatalist" placeholder="Buscar producto...">
+            <input type="text" id="gastoProductoInput" placeholder="Buscar producto..." autocomplete="off" autocorrect="off" spellcheck="false" inputmode="search">
+            <!-- Contenedor para sugerencias dinámicas de productos -->
+            <div id="gastoProductoSuggestions" class="suggestions" style="position:relative;"></div>
+            <!-- Datalist vacío para compatibilidad futura (no usado por el buscador personalizado) -->
             <datalist id="gastoProductosDatalist"></datalist>
         </label>
         <label>Cantidad del producto (si aplica)
@@ -748,6 +767,26 @@
             <label>% Impuesto aplicado
                 <input type="number" id="compraImpuesto" min="0" max="100" step="0.01" placeholder="0">
             </label>
+            <!-- Sección opcional de logística para registrar costos de transporte de la compra -->
+            <div id="compraLogistica" style="border:1px solid #333; padding:0.5rem; margin-top:0.5rem;">
+                <h4>Detalles de Logística (opcional)</h4>
+                <label>Distancia (km)
+                    <input type="number" id="compraDistancia" min="0" step="0.01">
+                </label>
+                <label>Tiempo (minutos) (opcional)
+                    <input type="number" id="compraTiempo" min="0" step="1">
+                </label>
+                <label>Costo de transporte
+                    <input type="number" id="compraCostoLog" min="0" step="0.01">
+                </label>
+                <label>Transporte
+                    <select id="compraTransporte">
+                        <option value="mio">Mi negocio</option>
+                        <option value="cliente">Cliente</option>
+                        <option value="tercero">Tercero</option>
+                    </select>
+                </label>
+            </div>
             <button class="primary" id="saveCompraBtn">Guardar Compra</button>
         </div>
     </div>
@@ -811,7 +850,7 @@
         <div class="modal-content">
             <button class="close-btn" onclick="toggleModal('aboutModal')">×</button>
             <h2>Acerca de</h2>
-            <p>Gestor Avanzado de Negocio v1.0</p>
+            <p>Gestor Avanzado de Negocio v1.8</p>
             <p>Creado por IA con tecnologías web modernas.</p>
             <p>Esta aplicación es de código abierto y está destinada a fines educativos y de ejemplo.</p>
         </div>
@@ -867,7 +906,7 @@
     </nav>
 
         <!-- Botón flotante para salir de pantalla completa -->
-        <button id="exitFullscreenBtn" style="position:fixed; top:0.5rem; right:0.5rem; display:none; z-index:2001; padding:0.5rem; border:none; border-radius:4px; background:#f44336; color:#fff; cursor:pointer;">Salir Pantalla Completa</button>
+        <button id="exitFullscreenBtn" style="position:fixed; top:4rem; right:0.5rem; display:none; z-index:2001; padding:0.5rem; border:none; border-radius:4px; background:#f44336; color:#fff; cursor:pointer;">Salir Pantalla Completa</button>
 
     <script>
         /***********************************************************************
@@ -1108,7 +1147,10 @@
                 document.getElementById('addVentaBtn').addEventListener('click', () => {
                 // Reiniciar campos del modal de venta
                 const prodInput = document.getElementById('ventaProductoInput');
-                if (prodInput) prodInput.value = '';
+                if (prodInput) {
+                    prodInput.value = '';
+                    prodInput.dataset.index = '';
+                }
                 document.getElementById('ventaPrecio').value = '';
                 document.getElementById('ventaServicio').value = 'llevar';
                 document.getElementById('ventaMesa').value = '';
@@ -1148,6 +1190,16 @@
                     // Mostrar detalles de delivery sólo si es delivery
                     document.getElementById('deliveryDetails').style.display = val === 'delivery' ? 'block' : 'none';
                 });
+
+            // Actualizar costo estimado del producto en gastos al cambiar nombre o cantidad
+            const gastoProdInput = document.getElementById('gastoProductoInput');
+            const gastoProdCantidad = document.getElementById('gastoProductoCantidad');
+            if (gastoProdInput) gastoProdInput.addEventListener('input', () => updateGastoProductoCost());
+            if (gastoProdCantidad) gastoProdCantidad.addEventListener('input', () => updateGastoProductoCost());
+
+            // Inicializar autocompletados personalizados para búsqueda de productos
+            setupProductAutocomplete();
+            setupGastoProductoAutocomplete();
             document.getElementById('saveVentaBtn').addEventListener('click', saveVenta);
             document.getElementById('saveGastoBtn').addEventListener('click', saveGasto);
 
@@ -1310,6 +1362,29 @@
                 importBtn.addEventListener('click', () => importInput.click());
                 importInput.addEventListener('change', (e) => importDataFile(e));
             }
+
+            // Guardar saldo inicial de banco
+            const bankBtn = document.getElementById('saveBankBudgetBtn');
+            const bankInput = document.getElementById('bankBudgetInput');
+            if (bankBtn && bankInput) {
+                // Inicializar el valor desde la configuración si existe
+                const cfg = getData(StorageKeys.config) || {};
+                if (cfg.bankBudget !== undefined) {
+                    bankInput.value = cfg.bankBudget;
+                }
+                bankBtn.addEventListener('click', () => {
+                    const val = parseFloat(bankInput.value);
+                    if (isNaN(val) || val < 0) {
+                        showToast('Ingresa un saldo válido para el banco.', 'error');
+                        return;
+                    }
+                    const cfg2 = getData(StorageKeys.config) || {};
+                    cfg2.bankBudget = val;
+                    setData(StorageKeys.config, cfg2);
+                    showToast('Saldo inicial de banco guardado.', 'success');
+                    refreshFinanzas();
+                });
+            }
         }
 
         function showSection(sectionId) {
@@ -1454,7 +1529,8 @@
                     unidades = ['kg','g'];
                     break;
                 case 'liquido':
-                    unidades = ['l','ml'];
+                    // Para líquidos aceptamos litros, mililitros y onzas líquidas (fl_oz) u onzas (oz)
+                    unidades = ['l','ml','fl_oz','oz'];
                     break;
                 case 'panqueso':
                     unidades = ['unidad','rebanada'];
@@ -1567,18 +1643,35 @@
             const nombre = document.getElementById('insNombre').value.trim();
             const categoria = document.getElementById('insCategoria').value;
             const unidad = document.getElementById('insUnidad').value;
-            const contenido = parseFloat(document.getElementById('insContenido').value) || 0;
+            let contenido = parseFloat(document.getElementById('insContenido').value) || 0;
             const precioTotal = parseFloat(document.getElementById('insPrecio').value) || 0;
             const impuesto = parseFloat(document.getElementById('insImpuesto').value) || 0;
             const merma = parseFloat(document.getElementById('insMerma').value) || 0;
-            const stock = parseFloat(document.getElementById('insStock').value);
+            let stock = parseFloat(document.getElementById('insStock').value);
             if (!nombre || !unidad || !contenido || !precioTotal) {
                 showToast('Completa todos los campos obligatorios para el insumo.', 'error');
                 return;
             }
+            // Convertir unidades especiales a unidades base para el cálculo
+            let unidadInterna = unidad;
+            if (unidad === 'fl_oz') {
+                // Convertir onzas líquidas a mililitros (1 fl oz ≈ 29.5735 ml)
+                contenido = contenido * 29.5735;
+                if (!isNaN(stock)) {
+                    stock = stock * 29.5735;
+                }
+                unidadInterna = 'ml';
+            } else if (unidad === 'oz') {
+                // Convertir onzas a gramos (1 oz ≈ 28.3495 g)
+                contenido = contenido * 28.3495;
+                if (!isNaN(stock)) {
+                    stock = stock * 28.3495;
+                }
+                unidadInterna = 'g';
+            }
             const inventario = getData(StorageKeys.inventario);
             const idx = document.getElementById('saveInsumoBtn').dataset.index;
-            const insumo = { nombre, categoria, unidad, contenido, precioTotal, impuesto, merma, stock: !isNaN(stock) ? stock : undefined, timestamp: timestamp() };
+            const insumo = { nombre, categoria, unidad: unidadInterna, contenido, precioTotal, impuesto, merma, stock: !isNaN(stock) ? stock : undefined, timestamp: timestamp() };
             if (idx === '') {
                 inventario.push(insumo);
             } else {
@@ -1616,26 +1709,49 @@
             addIngredienteField();
         }
         function addIngredienteField() {
-            // Actualizar datalist de insumos por si se añadió un insumo mientras se editaba el producto
-            populateInsumosDatalist();
+            // Crear un nuevo contenedor de fila para el insumo con autocompletado personalizado
             const container = document.getElementById('prodIngredientesContainer');
-            const div = document.createElement('div');
-            div.style.display = 'flex';
-            div.style.gap = '0.5rem';
-            div.style.marginBottom = '0.5rem';
-            // Crear input con datalist para buscar insumo
+            const rowDiv = document.createElement('div');
+            rowDiv.style.display = 'flex';
+            rowDiv.style.gap = '0.5rem';
+            rowDiv.style.marginBottom = '0.5rem';
+            rowDiv.style.position = 'relative';
+            // Input para el nombre del insumo
             const nombreInput = document.createElement('input');
             nombreInput.type = 'text';
-            nombreInput.setAttribute('list', 'insumosDatalist');
             nombreInput.placeholder = 'Insumo';
+            nombreInput.autocomplete = 'off';
+            nombreInput.autocorrect = 'off';
+            nombreInput.spellcheck = false;
             nombreInput.className = 'ing-nombre';
-            // Cantidad
+            // Guardar índice seleccionado
+            nombreInput.dataset.index = '';
+            rowDiv.appendChild(nombreInput);
+            // Contenedor de sugerencias para insumos
+            const sugg = document.createElement('div');
+            sugg.className = 'ing-suggestions';
+            sugg.style.position = 'absolute';
+            sugg.style.left = '0';
+            sugg.style.right = '0';
+            sugg.style.top = '100%';
+            sugg.style.backgroundColor = '#212121';
+            sugg.style.border = '1px solid #444';
+            sugg.style.zIndex = '3000';
+            sugg.style.maxHeight = '200px';
+            sugg.style.overflowY = 'auto';
+            sugg.style.display = 'none';
+            sugg.style.fontSize = '0.9rem';
+            rowDiv.appendChild(sugg);
+            // Configurar autocompletado del insumo
+            setupInsumoAutocomplete(nombreInput, sugg);
+            // Campo de cantidad
             const qty = document.createElement('input');
             qty.type = 'number';
             qty.min = '0';
             qty.step = '0.01';
             qty.placeholder = 'Cantidad';
             qty.className = 'ing-cantidad';
+            rowDiv.appendChild(qty);
             // Botón para eliminar ingrediente
             const del = document.createElement('button');
             del.textContent = '×';
@@ -1643,13 +1759,12 @@
             del.style.border = 'none';
             del.style.color = '#fff';
             del.style.borderRadius = '4px';
+            del.style.cursor = 'pointer';
             del.addEventListener('click', () => {
-                container.removeChild(div);
+                container.removeChild(rowDiv);
             });
-            div.appendChild(nombreInput);
-            div.appendChild(qty);
-            div.appendChild(del);
-            container.appendChild(div);
+            rowDiv.appendChild(del);
+            container.appendChild(rowDiv);
         }
         function saveProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
@@ -1671,7 +1786,17 @@
                     showToast('Selecciona un insumo y una cantidad válida para cada ingrediente.', 'error');
                     return;
                 }
-                const idx = inventario.findIndex(ins => ins.nombre === nombreInsumo);
+                // Usar índice seleccionado si está definido, de lo contrario buscar por nombre
+                let idx = -1;
+                if (nombreInput.dataset.index && nombreInput.dataset.index !== '') {
+                    const tmp = parseInt(nombreInput.dataset.index);
+                    if (!isNaN(tmp) && inventario[tmp]) {
+                        idx = tmp;
+                    }
+                }
+                if (idx === -1) {
+                    idx = inventario.findIndex(ins => ins.nombre && ins.nombre.toLowerCase() === nombreInsumo.toLowerCase());
+                }
                 if (idx === -1) {
                     showToast(`El insumo "${nombreInsumo}" no existe en el inventario.`, 'error');
                     return;
@@ -1765,7 +1890,13 @@
                 // Establecer el nombre del insumo y cantidad
                 const nombreInput = lastDiv.querySelector('.ing-nombre');
                 const qtyInput = lastDiv.querySelector('.ing-cantidad');
-                if (nombreInput) nombreInput.value = ing.insumoNombre;
+                if (nombreInput) {
+                    nombreInput.value = ing.insumoNombre;
+                    // Guardar el índice del insumo en dataset para conservar la referencia
+                    if (typeof ing.insumoIndex !== 'undefined') {
+                        nombreInput.dataset.index = ing.insumoIndex;
+                    }
+                }
                 if (qtyInput) qtyInput.value = ing.cantidad;
             });
             document.getElementById('saveProductoBtn').dataset.index = index;
@@ -1912,12 +2043,37 @@
             }
             const precio = precioUnitario * cantidad;
             const productos = getData(StorageKeys.productos);
-            // Buscar el producto para obtener COGS (insensible a mayúsculas/minúsculas)
+            // Buscar el producto seleccionado a través del índice del dataset o por nombre
             let cogs = 0;
-            const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === productoNombre.toLowerCase());
+            let prod = null;
+            const prodIndexStr = document.getElementById('ventaProductoInput').dataset.index;
+            if (prodIndexStr !== undefined && prodIndexStr !== '') {
+                const idxSel = parseInt(prodIndexStr);
+                if (!isNaN(idxSel) && productos[idxSel]) {
+                    prod = productos[idxSel];
+                }
+            }
+            // Si no se seleccionó por índice, buscar por nombre (insensible a mayúsculas/minúsculas)
+            if (!prod) {
+                prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === productoNombre.toLowerCase());
+            }
             if (prod) {
+                // Verificar si hay stock suficiente antes de calcular COGS
+                const inventarioCheck = getData(StorageKeys.inventario);
+                const faltaStock = prod.ingredientes.some(ing => {
+                    const ins = inventarioCheck[ing.insumoIndex];
+                    const requerido = ing.cantidad * cantidad;
+                    const disp = ins && ins.stock !== undefined ? ins.stock : 0;
+                    return disp < requerido;
+                });
+                if (faltaStock) {
+                    showToast('No hay suficiente stock para completar esta venta. Por favor reabastece los insumos.', 'error');
+                    return;
+                }
                 prod.ingredientes.forEach(ing => {
-                    const ins = getData(StorageKeys.inventario)[ing.insumoIndex];
+                    const inv = getData(StorageKeys.inventario);
+                    const ins = inv[ing.insumoIndex];
+                    if (!ins) return;
                     const mermaFactor = (100 - (ins.merma || 0)) / 100;
                     const costoBase = ins.precioTotal / (ins.contenido || 1);
                     const costoConImpuesto = costoBase * (1 + (ins.impuesto || 0) / 100);
@@ -2033,22 +2189,31 @@
             const categoria = document.getElementById('gastoCategoria').value.trim();
             const insumoIdx = document.getElementById('gastoInsumoSelect').value;
             const insumoQty = parseFloat(document.getElementById('gastoInsumoCantidad').value) || 0;
-            const prodName = document.getElementById('gastoProductoInput').value.trim();
+            const prodInputField = document.getElementById('gastoProductoInput');
+            const prodName = prodInputField.value.trim();
             const prodQty = parseFloat(document.getElementById('gastoProductoCantidad').value) || 0;
             const inventario = getData(StorageKeys.inventario) || [];
             const productos = getData(StorageKeys.productos) || [];
             let finalMonto = montoInput;
             let finalDesc = descripcion;
             let finalCategoria = categoria.trim();
-            // Si se seleccionó un producto por nombre, calcular su costo
-            if (prodName && prodQty > 0) {
-                // Buscar producto de forma insensible a mayúsculas/minúsculas
-                const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
-                if (prod) {
-                    finalMonto = prod.precio * prodQty;
-                    finalDesc = descripcion ? `${descripcion} (Consumo de ${prod.nombre})` : `Consumo de ${prod.nombre}`;
-                    finalCategoria = finalCategoria || 'Consumo Producto';
+            // Si se seleccionó un producto por índice o nombre, calcular su costo
+            const prodIndexStr = prodInputField.dataset.index;
+            let selectedProd = null;
+            if (prodIndexStr !== undefined && prodIndexStr !== '') {
+                const idxSel = parseInt(prodIndexStr);
+                if (!isNaN(idxSel) && productos[idxSel]) {
+                    selectedProd = productos[idxSel];
                 }
+            }
+            // Si no hay índice, buscar por nombre (insensible a mayúsculas)
+            if (!selectedProd && prodName) {
+                selectedProd = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
+            }
+            if (selectedProd && prodQty > 0) {
+                finalMonto = selectedProd.precio * prodQty;
+                finalDesc = descripcion ? `${descripcion} (Consumo de ${selectedProd.nombre})` : `Consumo de ${selectedProd.nombre}`;
+                finalCategoria = finalCategoria || 'Consumo Producto';
             } else if (insumoIdx !== '' && !isNaN(insumoIdx) && insumoQty > 0) {
                 // Si no se seleccionó producto, pero sí insumo, calcular costo por insumo
                 const ins = inventario[insumoIdx];
@@ -2281,7 +2446,12 @@
             const hoy = new Date(document.getElementById('operacionDate').value || new Date());
             // Saldos acumulados
             let cashBalance = 0;
+            // Incluir saldo inicial del banco desde la configuración
             let bankBalance = 0;
+            if (cfg && cfg.bankBudget !== undefined) {
+                const budgetVal = parseFloat(cfg.bankBudget);
+                if (!isNaN(budgetVal)) bankBalance = budgetVal;
+            }
             // Totales por periodo
             let totalDia = { ingresos:0, gastos:0 };
             let totalSemana = { ingresos:0, gastos:0 };
@@ -2655,7 +2825,7 @@
                 document.getElementById('logisticaList').innerHTML = '';
                 return;
             }
-            // Calcular totales
+            // Calcular totales de logística
             let totalCost = 0;
             const listHtml = [];
             events.forEach((e) => {
@@ -2680,6 +2850,239 @@
             const avgCost = totalCost / events.length;
             document.getElementById('logisticaResumen').innerHTML = `Total entregas: ${events.length}<br>Total costo: ${totalCost.toFixed(2)} ${cfg.simboloMoneda}<br>Costo promedio por entrega: ${avgCost.toFixed(2)} ${cfg.simboloMoneda}`;
             document.getElementById('logisticaList').innerHTML = listHtml.join('');
+        }
+
+        /***********************************************************************
+         *  Autocompletado personalizado para búsqueda de productos
+         *
+         * Para mejorar la experiencia en dispositivos móviles, este módulo
+         * reemplaza el datalist por un cuadro de sugerencias propio. Muestra
+         * hasta cinco coincidencias filtradas por el texto ingresado y
+         * permite seleccionar un producto para rellenar el campo y el precio
+         * automáticamente. También se ofrece un autocompletado similar para
+         * seleccionar productos en el formulario de gastos.
+         **********************************************************************/
+
+        // Configura el autocompletado en el formulario de venta
+        function setupProductAutocomplete() {
+            const input = document.getElementById('ventaProductoInput');
+            const suggestionsContainer = document.getElementById('ventaProductoSuggestions');
+            if (!input || !suggestionsContainer) return;
+            // Aseguramos que el contenedor esté posicionado adecuadamente
+            // Posicionamos el padre como relativo para que el contenedor absoluto se ancle correctamente
+            input.parentNode.style.position = 'relative';
+            suggestionsContainer.style.position = 'absolute';
+            suggestionsContainer.style.left = '0';
+            suggestionsContainer.style.right = '0';
+            suggestionsContainer.style.top = '100%';
+            suggestionsContainer.style.backgroundColor = '#212121';
+            suggestionsContainer.style.border = '1px solid #444';
+            suggestionsContainer.style.zIndex = '3000';
+            suggestionsContainer.style.maxHeight = '200px';
+            suggestionsContainer.style.overflowY = 'auto';
+            suggestionsContainer.style.display = 'none';
+            suggestionsContainer.style.fontSize = '0.9rem';
+            // Control de eventos de entrada
+            input.addEventListener('input', () => updateVentaSuggestions());
+            input.addEventListener('focus', () => updateVentaSuggestions());
+            // Ocultar sugerencias al perder foco (con retardo para permitir clic)
+            input.addEventListener('blur', () => setTimeout(() => { suggestionsContainer.style.display = 'none'; }, 150));
+        }
+
+        function updateVentaSuggestions() {
+            const input = document.getElementById('ventaProductoInput');
+            const suggestionsContainer = document.getElementById('ventaProductoSuggestions');
+            if (!input || !suggestionsContainer) return;
+            const productos = getData(StorageKeys.productos) || [];
+            const query = input.value.trim().toLowerCase();
+            suggestionsContainer.innerHTML = '';
+            if (!query) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            const cfg = getData(StorageKeys.config);
+            // Filtrar coincidencias
+            const matches = productos.filter(p => p.nombre && p.nombre.toLowerCase().includes(query));
+            if (!matches.length) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            matches.slice(0, 5).forEach(p => {
+                const item = document.createElement('div');
+                item.textContent = `${p.nombre} - ${p.precio.toFixed(2)} ${cfg.simboloMoneda}`;
+                item.style.padding = '0.4rem 0.6rem';
+                item.style.cursor = 'pointer';
+                item.addEventListener('mousedown', (e) => {
+                    // Prevenir blur antes de click
+                    e.preventDefault();
+                    selectVentaProducto(p);
+                });
+                suggestionsContainer.appendChild(item);
+            });
+            suggestionsContainer.style.display = 'block';
+        }
+
+        function selectVentaProducto(prod) {
+            const input = document.getElementById('ventaProductoInput');
+            const precioField = document.getElementById('ventaPrecio');
+            if (!input || !precioField) return;
+            input.value = prod.nombre;
+            // Guardar índice del producto seleccionado en dataset para uso en saveVenta
+            const productos = getData(StorageKeys.productos) || [];
+            const idx = productos.findIndex(p => p.nombre === prod.nombre);
+            if (idx >= 0) {
+                input.dataset.index = idx;
+            }
+            // Rellenar precio si no está definido o es cero
+            if (!precioField.value || parseFloat(precioField.value) === 0) {
+                precioField.value = prod.precio;
+            }
+            // Ocultar sugerencias
+            const suggestionsContainer = document.getElementById('ventaProductoSuggestions');
+            suggestionsContainer.style.display = 'none';
+        }
+
+        // Configura el autocompletado en el formulario de gasto
+        function setupGastoProductoAutocomplete() {
+            const input = document.getElementById('gastoProductoInput');
+            const suggestionsContainer = document.getElementById('gastoProductoSuggestions');
+            if (!input || !suggestionsContainer) return;
+            // Posicionar el padre como relativo para anclar correctamente el contenedor
+            input.parentNode.style.position = 'relative';
+            suggestionsContainer.style.position = 'absolute';
+            suggestionsContainer.style.left = '0';
+            suggestionsContainer.style.right = '0';
+            suggestionsContainer.style.top = '100%';
+            suggestionsContainer.style.backgroundColor = '#212121';
+            suggestionsContainer.style.border = '1px solid #444';
+            suggestionsContainer.style.zIndex = '3000';
+            suggestionsContainer.style.maxHeight = '200px';
+            suggestionsContainer.style.overflowY = 'auto';
+            suggestionsContainer.style.display = 'none';
+            suggestionsContainer.style.fontSize = '0.9rem';
+            input.addEventListener('input', () => updateGastoProductoSuggestions());
+            input.addEventListener('focus', () => updateGastoProductoSuggestions());
+            input.addEventListener('blur', () => setTimeout(() => { suggestionsContainer.style.display = 'none'; }, 150));
+        }
+
+        function updateGastoProductoSuggestions() {
+            const input = document.getElementById('gastoProductoInput');
+            const suggestionsContainer = document.getElementById('gastoProductoSuggestions');
+            if (!input || !suggestionsContainer) return;
+            const productos = getData(StorageKeys.productos) || [];
+            const query = input.value.trim().toLowerCase();
+            suggestionsContainer.innerHTML = '';
+            if (!query) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            const cfg = getData(StorageKeys.config);
+            const matches = productos.filter(p => p.nombre && p.nombre.toLowerCase().includes(query));
+            if (!matches.length) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            matches.slice(0, 5).forEach(p => {
+                const item = document.createElement('div');
+                item.textContent = `${p.nombre} - ${p.precio.toFixed(2)} ${cfg.simboloMoneda}`;
+                item.style.padding = '0.4rem 0.6rem';
+                item.style.cursor = 'pointer';
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selectGastoProducto(p);
+                });
+                suggestionsContainer.appendChild(item);
+            });
+            suggestionsContainer.style.display = 'block';
+        }
+
+        function selectGastoProducto(prod) {
+            const input = document.getElementById('gastoProductoInput');
+            const qtyField = document.getElementById('gastoProductoCantidad');
+            const costLabel = document.getElementById('gastoProductoCosto');
+            if (!input) return;
+            input.value = prod.nombre;
+            // Guardar índice del producto seleccionado en dataset
+            const productos = getData(StorageKeys.productos) || [];
+            const idx = productos.findIndex(p => p.nombre === prod.nombre);
+            if (idx >= 0) {
+                input.dataset.index = idx;
+            }
+            // Actualizar costo estimado si hay cantidad
+            const qty = parseFloat(qtyField.value) || 0;
+            const cfg = getData(StorageKeys.config);
+            if (qty > 0) {
+                costLabel.textContent = (prod.precio * qty).toFixed(2) + ' ' + cfg.simboloMoneda;
+            }
+            const suggestionsContainer = document.getElementById('gastoProductoSuggestions');
+            suggestionsContainer.style.display = 'none';
+        }
+
+        /***********************************************************************
+         *  Autocompletado para selección de insumos en los productos
+         *
+         *  Similar al autocompletado de productos, este módulo proporciona
+         *  sugerencias de insumos al crear o editar un producto.  Cada campo
+         *  de insumo tiene su propio contenedor de sugerencias y almacena
+         *  el índice del insumo seleccionado en el atributo dataset.index
+         *  del input.  Esto facilita la búsqueda posterior al guardar el
+         *  producto.
+         **********************************************************************/
+        function setupInsumoAutocomplete(input, suggestionsContainer) {
+            if (!input || !suggestionsContainer) return;
+            // Al escribir o enfocar, actualizar sugerencias
+            input.addEventListener('input', () => updateInsumoSuggestions(input, suggestionsContainer));
+            input.addEventListener('focus', () => updateInsumoSuggestions(input, suggestionsContainer));
+            // Ocultar sugerencias al perder foco
+            input.addEventListener('blur', () => setTimeout(() => {
+                suggestionsContainer.style.display = 'none';
+            }, 150));
+        }
+
+        function updateInsumoSuggestions(input, container) {
+            if (!input || !container) return;
+            const inventario = getData(StorageKeys.inventario) || [];
+            const query = input.value.trim().toLowerCase();
+            container.innerHTML = '';
+            if (!query) {
+                container.style.display = 'none';
+                input.dataset.index = '';
+                return;
+            }
+            // Filtrar coincidencias por nombre de insumo
+            const matches = inventario.filter(ins => ins.nombre && ins.nombre.toLowerCase().includes(query));
+            if (!matches.length) {
+                container.style.display = 'none';
+                input.dataset.index = '';
+                return;
+            }
+            matches.slice(0, 5).forEach(ins => {
+                const item = document.createElement('div');
+                item.textContent = ins.nombre;
+                item.style.padding = '0.4rem 0.6rem';
+                item.style.cursor = 'pointer';
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selectInsumo(ins, input, container);
+                });
+                container.appendChild(item);
+            });
+            container.style.display = 'block';
+        }
+
+        function selectInsumo(insumo, input, container) {
+            if (!insumo || !input) return;
+            input.value = insumo.nombre;
+            // Buscar el índice del insumo en el inventario y almacenarlo en dataset
+            const inventario = getData(StorageKeys.inventario) || [];
+            const idx = inventario.findIndex(ins => ins.nombre === insumo.nombre);
+            if (idx >= 0) {
+                input.dataset.index = idx;
+            } else {
+                input.dataset.index = '';
+            }
+            // Ocultar sugerencias
+            if (container) container.style.display = 'none';
         }
 
         /************************************************************************
@@ -2760,13 +3163,46 @@
                 transacciones[key] = { ventas: [], gastos: [], gastosOperativos: [] };
             }
             transacciones[key].gastos.push({ descripcion: `Compra de ${insumo.nombre}`, monto: precioTotal * (1 + impuesto / 100), categoria: 'Compra Inventario', hora: timestamp() });
+            // Registrar logística de compra si se proporcionaron datos
+            const distCompra = parseFloat(document.getElementById('compraDistancia').value) || 0;
+            const tiempoCompra = parseFloat(document.getElementById('compraTiempo').value) || 0;
+            const costoLogCompra = parseFloat(document.getElementById('compraCostoLog').value) || 0;
+            const transpoCompra = (document.getElementById('compraTransporte') && document.getElementById('compraTransporte').value) || 'mio';
+            // Si se ingresan datos de logística (costo, distancia o tiempo), registrarlos
+            if (costoLogCompra > 0 || distCompra > 0 || tiempoCompra > 0) {
+                const logisticaEvents = getData(StorageKeys.logistica) || [];
+                logisticaEvents.push({
+                    date: key,
+                    producto: `Compra ${insumo.nombre}`,
+                    distancia: distCompra,
+                    tiempo: tiempoCompra,
+                    transporte: transpoCompra,
+                    costo: costoLogCompra,
+                    ventaHora: timestamp(),
+                    direccion: '',
+                    tipo: 'compra',
+                    timestamp: timestamp()
+                });
+                setData(StorageKeys.logistica, logisticaEvents);
+                // Registrar costo logístico como gasto adicional
+                transacciones[key].gastos.push({
+                    descripcion: `Logística compra ${insumo.nombre}`,
+                    monto: costoLogCompra,
+                    categoria: 'Logística',
+                    hora: timestamp()
+                });
+            }
             setData(StorageKeys.transacciones, transacciones);
+            // Cerrar modal y refrescar vistas
             toggleModal('compraModal');
             refreshInventarioList();
             refreshGastos();
             refreshOperacionesUI();
             refreshFinanzas();
             refreshAnalisis();
+            if (costoLogCompra > 0 || distCompra > 0 || tiempoCompra > 0) {
+                refreshLogistica();
+            }
             showToast('Compra registrada correctamente.', 'success');
         }
 
@@ -3036,18 +3472,31 @@
             const qtyInput = document.getElementById('gastoProductoCantidad');
             const costP = document.getElementById('gastoProductoCosto');
             if (!prodInput || !qtyInput || !costP) return;
-            const prodName = prodInput.value.trim();
             const qty = parseFloat(qtyInput.value) || 0;
-            if (prodName !== '' && qty > 0) {
-                const productos = getData(StorageKeys.productos) || [];
-                const prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
-                if (prod) {
-                    const cost = prod.precio * qty;
-                    const cfg = getData(StorageKeys.config);
-                    costP.textContent = `Costo estimado por producto: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
-                    return;
+            // Primero comprobar si se seleccionó un índice guardado en dataset
+            const prodIndexStr = prodInput.dataset.index;
+            let prod = null;
+            const productos = getData(StorageKeys.productos) || [];
+            if (prodIndexStr !== undefined && prodIndexStr !== '') {
+                const idxSel = parseInt(prodIndexStr);
+                if (!isNaN(idxSel) && productos[idxSel]) {
+                    prod = productos[idxSel];
                 }
             }
+            // Si no hay índice, buscar por nombre insensible a mayúsculas/minúsculas
+            if (!prod) {
+                const prodName = prodInput.value.trim();
+                if (prodName !== '') {
+                    prod = productos.find(p => p.nombre && p.nombre.toLowerCase() === prodName.toLowerCase());
+                }
+            }
+            if (prod && qty > 0) {
+                const cost = prod.precio * qty;
+                const cfg = getData(StorageKeys.config);
+                costP.textContent = `Costo estimado por producto: ${cost.toFixed(2)} ${cfg.simboloMoneda}`;
+                return;
+            }
+            // Si no hay coincidencias, limpiar el texto
             costP.textContent = '';
         }
 
